@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carte politique des maires de France — Municipales 2020</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+#map { width: 100vw; height: 100vh; background: #1a1a2e; }
+
+#legend {
+  position: absolute; bottom: 30px; left: 10px; z-index: 1000;
+  background: rgba(255,255,255,0.95); padding: 14px 16px;
+  border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  font-size: 13px; max-width: 280px;
+}
+#legend h3 { margin-bottom: 8px; font-size: 14px; }
+.legend-item { display: flex; align-items: center; margin: 4px 0; cursor: pointer; }
+.legend-item:hover { background: #f0f0f0; border-radius: 4px; }
+.legend-swatch {
+  width: 16px; height: 16px; border-radius: 3px;
+  margin-right: 8px; flex-shrink: 0; border: 1px solid rgba(0,0,0,0.2);
+}
+.legend-label { font-size: 12px; }
+.legend-count { font-size: 11px; color: #666; margin-left: auto; padding-left: 8px; }
+
+#info {
+  position: absolute; top: 10px; right: 10px; z-index: 1000;
+  background: rgba(255,255,255,0.95); padding: 14px 16px;
+  border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  font-size: 13px; min-width: 240px; display: none;
+}
+#info h3 { font-size: 15px; margin-bottom: 6px; }
+#info .detail { margin: 3px 0; }
+#info .detail strong { display: inline-block; min-width: 60px; }
+
+#title-bar {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+  z-index: 1000; background: rgba(255,255,255,0.95); padding: 10px 20px;
+  border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  text-align: center;
+}
+#title-bar h1 { font-size: 16px; font-weight: 700; }
+#title-bar p { font-size: 12px; color: #666; margin-top: 2px; }
+
+#loading {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  z-index: 2000; background: rgba(255,255,255,0.95); padding: 30px 40px;
+  border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  text-align: center; font-size: 16px;
+}
+#loading .spinner {
+  width: 40px; height: 40px; border: 4px solid #ddd;
+  border-top-color: #0066CC; border-radius: 50%;
+  animation: spin 0.8s linear infinite; margin: 0 auto 15px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#filter-bar {
+  position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+  z-index: 1000; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+}
+.filter-btn {
+  padding: 5px 12px; border-radius: 20px; border: 2px solid #ccc;
+  background: white; cursor: pointer; font-size: 12px; font-weight: 500;
+  transition: all 0.2s;
+}
+.filter-btn:hover { border-color: #999; }
+.filter-btn.active { border-color: #333; background: #333; color: white; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div>Chargement des 35 000 communes...</div>
+  <div id="load-status" style="font-size:12px;color:#666;margin-top:8px;"></div>
+</div>
+
+<div id="title-bar">
+  <h1>Carte politique des maires de France</h1>
+  <p>Nuance politique du maire — Municipales 2020</p>
+</div>
+
+<div id="filter-bar"></div>
+
+<div id="map"></div>
+
+<div id="legend">
+  <h3>Famille politique</h3>
+  <div id="legend-items"></div>
+</div>
+
+<div id="info">
+  <h3 id="info-name"></h3>
+  <div class="detail" id="info-maire-row"><strong>Maire :</strong> <span id="info-maire"></span></div>
+  <div class="detail"><strong>Nuance :</strong> <span id="info-nuance"></span></div>
+  <div class="detail"><strong>Famille :</strong> <span id="info-famille"></span></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script>
+(async function() {
+  var map = L.map('map', {
+    center: [46.5, 2.5],
+    zoom: 6,
+    zoomSnap: 0.5,
+    preferCanvas: true
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+    attribution: '\u00a9 CARTO | Donnees: data.gouv.fr (RNE)',
+    maxZoom: 18
+  }).addTo(map);
+
+  var status = document.getElementById('load-status');
+
+  // Load data
+  status.textContent = 'Telechargement des donnees maires...';
+  var mairesResp = await fetch('maires.json');
+  var maires = await mairesResp.json();
+
+  status.textContent = 'Telechargement des contours (12 Mo)...';
+  var topoResp = await fetch('communes-topo.json');
+  var topoData = await topoResp.json();
+
+  status.textContent = 'Construction de la carte...';
+
+  // Convert TopoJSON to GeoJSON
+  var communesGeo = topojson.feature(topoData, topoData.objects.a_com2022);
+
+  // Familles in display order (not sorted by count — intentional ordering)
+  var FAMILLES = [
+    { key: 'Gauche',                     color: '#E2001A', label: 'Gauche' },
+    { key: 'Centre',                     color: '#FFB300', label: 'Centre' },
+    { key: 'Droite',                     color: '#0056A6', label: 'Droite' },
+    { key: 'Extrême droite',             color: '#0D1B4A', label: 'Extreme droite' },
+    { key: 'Courants politiques divers', color: '#9E9E9E', label: 'Divers' },
+    { key: 'Non classé',                 color: '#CCCCCC', label: 'Non classe' }
+  ];
+
+  // Count communes per famille
+  var familleCounts = {};
+  FAMILLES.forEach(function(f) { familleCounts[f.key] = 0; });
+  for (var code in maires) {
+    var fam = maires[code].f;
+    if (familleCounts[fam] !== undefined) {
+      familleCounts[fam]++;
+    }
+  }
+
+  // Build legend
+  var legendEl = document.getElementById('legend-items');
+  FAMILLES.forEach(function(f) {
+    var item = document.createElement('div');
+    item.className = 'legend-item';
+
+    var swatch = document.createElement('div');
+    swatch.className = 'legend-swatch';
+    swatch.style.background = f.color;
+    if (f.key === 'Non classé') swatch.style.opacity = '0.4';
+
+    var label = document.createElement('span');
+    label.className = 'legend-label';
+    label.textContent = f.label;
+
+    var countEl = document.createElement('span');
+    countEl.className = 'legend-count';
+    countEl.textContent = (familleCounts[f.key] || 0).toLocaleString('fr');
+
+    item.appendChild(swatch);
+    item.appendChild(label);
+    item.appendChild(countEl);
+
+    item.addEventListener('click', (function(famille) {
+      return function() { activeFilter = famille; updateFilter(); };
+    })(f.key));
+
+    legendEl.appendChild(item);
+  });
+
+  // Build filter buttons
+  var filterBar = document.getElementById('filter-bar');
+  var activeFilter = null;
+
+  var allBtn = document.createElement('button');
+  allBtn.className = 'filter-btn active';
+  allBtn.textContent = 'Tous';
+  allBtn.addEventListener('click', function() { activeFilter = null; updateFilter(); });
+  filterBar.appendChild(allBtn);
+
+  FAMILLES.forEach(function(f) {
+    var btn = document.createElement('button');
+    btn.className = 'filter-btn';
+    btn.textContent = f.label;
+    btn.setAttribute('data-famille', f.key);
+    btn.style.borderColor = f.color;
+    btn.addEventListener('click', function() { activeFilter = f.key; updateFilter(); });
+    filterBar.appendChild(btn);
+  });
+
+  // Style function
+  function getStyle(feature) {
+    var code = feature.properties.codgeo;
+    var m = maires[code];
+    if (!m) return { fillColor: '#444', fillOpacity: 0.15, weight: 0.2, color: '#222', opacity: 0.5 };
+
+    var isNC = m.f === 'Non classé';
+    var isFiltered = activeFilter && m.f !== activeFilter;
+
+    if (isFiltered) {
+      return { fillColor: '#333', fillOpacity: 0.15, weight: 0.2, color: '#111', opacity: 0.3 };
+    }
+
+    return {
+      fillColor: m.cl,
+      fillOpacity: isNC ? 0.3 : 0.8,
+      weight: 0.3,
+      color: '#111',
+      opacity: 0.4
+    };
+  }
+
+  // Info panel
+  var infoPanel = document.getElementById('info');
+  function showInfo(feature) {
+    var code = feature.properties.codgeo;
+    var m = maires[code];
+    if (!m) return;
+    document.getElementById('info-name').textContent = m.n + ' (' + code + ')';
+    document.getElementById('info-maire').textContent = m.m || '—';
+    document.getElementById('info-nuance').textContent = m.lb + ' (' + m.nu + ')';
+    document.getElementById('info-famille').textContent = m.f;
+    infoPanel.style.display = 'block';
+  }
+
+  // Create GeoJSON layer
+  var geoLayer = L.geoJSON(communesGeo, {
+    style: getStyle,
+    onEachFeature: function(feature, layer) {
+      layer.on({
+        mouseover: function(e) {
+          showInfo(feature);
+          e.target.setStyle({ weight: 2, color: '#fff', opacity: 1 });
+          e.target.bringToFront();
+        },
+        mouseout: function(e) {
+          geoLayer.resetStyle(e.target);
+        },
+        click: function(e) {
+          map.fitBounds(e.target.getBounds());
+        }
+      });
+    }
+  }).addTo(map);
+
+  // Filter update function
+  function updateFilter() {
+    var buttons = document.querySelectorAll('.filter-btn');
+    for (var i = 0; i < buttons.length; i++) {
+      var btn = buttons[i];
+      var isActive = (!activeFilter && btn.textContent === 'Tous') ||
+                     (activeFilter && btn.getAttribute('data-famille') === activeFilter);
+      if (isActive) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
+    geoLayer.setStyle(getStyle);
+  }
+
+  // Hide loading
+  document.getElementById('loading').style.display = 'none';
+
+})();
+</script>
+</body>
+</html>
