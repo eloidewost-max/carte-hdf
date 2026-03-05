@@ -38,6 +38,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   position: fixed; z-index: 1100;
   padding: 14px 16px; pointer-events: none;
   font-size: 13px; min-width: 240px; max-width: 320px; display: none;
+  transform-origin: top left;
 }
 #info h3 { font-size: 15px; margin-bottom: 6px; font-weight: 700; letter-spacing: -0.3px; color: #fff; }
 #info .detail { margin: 3px 0; }
@@ -136,6 +137,30 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 .data-year { font-size: 11px; color: #777; font-style: italic; margin-left: 4px; }
 
 /* --- Mode-specific overrides --- */
+
+/* --- Panel & tooltip transition animations --- */
+.panel-enter {
+  animation: panelSlideIn 0.25s ease-out both;
+}
+.panel-exit {
+  animation: panelSlideOut 0.2s ease-in both;
+}
+@keyframes panelSlideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes panelSlideOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(8px); }
+}
+
+#info.tooltip-enter {
+  animation: tooltipIn 0.15s ease-out both;
+}
+@keyframes tooltipIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
 
 /* --- Responsive --- */
 @media (max-width: 768px) {
@@ -797,6 +822,9 @@ input[type="range"]::-moz-range-thumb {
       layer.on({
         mouseover: function(e) {
           showInfo(feature);
+          infoPanel.classList.remove('tooltip-enter');
+          void infoPanel.offsetWidth; // force reflow
+          infoPanel.classList.add('tooltip-enter');
           positionInfo(e.originalEvent);
           e.target.setStyle({ weight: 2, color: '#fff', opacity: 1 });
           e.target.bringToFront();
@@ -805,6 +833,7 @@ input[type="range"]::-moz-range-thumb {
           positionInfo(e.originalEvent);
         },
         mouseout: function(e) {
+          infoPanel.classList.remove('tooltip-enter');
           infoPanel.style.display = 'none';
           geoLayer.resetStyle(e.target);
         },
@@ -869,6 +898,24 @@ input[type="range"]::-moz-range-thumb {
     statsPanel.style.display = 'block';
   });
 
+  function animatePanel(el, show) {
+    if (show) {
+      el.style.display = el.id === 'filter-bar' ? 'flex' : 'block';
+      el.classList.remove('panel-exit');
+      el.classList.add('panel-enter');
+    } else if (el.style.display !== 'none' && el.style.display !== '') {
+      el.classList.remove('panel-enter');
+      el.classList.add('panel-exit');
+      el.addEventListener('animationend', function handler() {
+        el.style.display = 'none';
+        el.classList.remove('panel-exit');
+        el.removeEventListener('animationend', handler);
+      });
+    } else {
+      el.style.display = 'none';
+    }
+  }
+
   function switchMode(mode) {
     currentMode = mode;
     var btns = document.querySelectorAll('.mode-btn');
@@ -876,8 +923,8 @@ input[type="range"]::-moz-range-thumb {
       btns[i].classList.toggle('active', btns[i].getAttribute('data-mode') === mode);
     }
 
-    document.getElementById('filter-bar').style.display = mode === 'politique' ? 'flex' : 'none';
-    document.getElementById('surv-filters').style.display = mode === 'surveillance' ? 'flex' : 'none';
+    animatePanel(document.getElementById('filter-bar'), mode === 'politique');
+    animatePanel(document.getElementById('surv-filters'), mode === 'surveillance');
     var showStats = (mode === 'surveillance' || mode === 'prospection');
     if (showStats && statsPanelCollapsed) {
       statsPanel.style.display = 'none';
