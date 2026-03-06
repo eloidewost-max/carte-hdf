@@ -76,7 +76,7 @@ python3 process_maires.py           # requires nuances-communes.csv + elus-maire
 python3 process_surveillance.py     # downloads from data.gouv.fr APIs
 python3 process_prospection.py      # builds prospection scoring data
 python3 process_delinquance.py      # downloads parquet from data.gouv.fr (~14 MB)
-python3 process_enrichment.py       # downloads QPV CSV, DGFiP JSON, Filosofi XLSX
+python3 process_enrichment.py       # downloads QPV CSV, DGFiP JSON, Filosofi 2021 CSV
 ```
 
 ### Development

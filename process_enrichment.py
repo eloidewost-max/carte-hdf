@@ -6,7 +6,7 @@ Produces enrichment.json indexed by INSEE code.
 Data sources:
 - QPV (Quartiers Prioritaires de la Politique de la Ville) 2024 (data.gouv.fr, CSV)
 - Comptes individuels des communes 2022 (DGFiP, JSON)
-- Revenus Filosofi 2013 (data.gouv.fr, XLSX) -- optional, may fail
+- Revenus Filosofi 2021 (INSEE via data.gouv.fr, CSV zip)
 """
 import json
 import math
@@ -23,7 +23,7 @@ QPV_URL = "https://static.data.gouv.fr/resources/quartiers-prioritaires-de-la-po
 
 COMPTES_URL = "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/comptes-individuels-des-communes-fichier-global-2022/exports/json"
 
-REVENUS_URL = "https://static.data.gouv.fr/resources/revenus-des-francais-a-la-commune/20171102-114238/Niveau_de_vie_2013_a_la_commune-Global_Map_Solution.xlsx"
+REVENUS_URL = "https://api.insee.fr/melodi/file/DS_FILOSOFI_CC/DS_FILOSOFI_CC_2021_CSV_FR"
 
 
 # ---------------------------------------------------------------------------
@@ -187,106 +187,105 @@ def parse_comptes():
 
 
 # ---------------------------------------------------------------------------
-# Source 3: Revenus Filosofi 2013 (optional)
+# Source 3: Revenus Filosofi 2021 (INSEE)
 # ---------------------------------------------------------------------------
 
 def parse_revenus():
-    """Download and parse Filosofi 2013 XLSX.
+    """Download and parse Filosofi 2021 CSV (zip) from INSEE.
+
+    The file is a zip containing a long-format CSV with one row per
+    (commune, measure).  We extract:
+      - MED_SL  → rev_med  (niveau de vie médian, EUR/an)
+      - PR_MD60 → tx_pauv  (taux de pauvreté à 60 %, %)
 
     Returns dict {insee_code: {rev_med, tx_pauv}}.
-    May fail gracefully if file is unavailable or unparseable.
     """
-    print("Downloading Revenus Filosofi 2013 XLSX (optional)...", file=sys.stderr)
+    import csv
+    import io
+    import zipfile
+
+    print("Downloading Revenus Filosofi 2021 CSV (INSEE)...", file=sys.stderr)
     tmp_path = None
     try:
-        import pandas as pd
-
-        tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
+        tmp = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
         tmp_path = tmp.name
         tmp.close()
-        urllib.request.urlretrieve(REVENUS_URL, tmp_path)
 
-        df = pd.read_excel(tmp_path, engine="openpyxl")
-        print(f"  Revenus: {len(df)} rows, columns: {list(df.columns)}", file=sys.stderr)
+        req = urllib.request.Request(REVENUS_URL)
+        req.add_header("User-Agent", "Mozilla/5.0 (carte-politique research bot)")
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            with open(tmp_path, "wb") as out:
+                out.write(resp.read())
 
-        # Find commune code column
-        code_col = None
-        for candidate in ["CODGEO", "codgeo", "code_commune", "COM", "Code commune",
-                          "Code_commune", "Code Commune", "INSEE", "insee",
-                          "code_insee", "Code INSEE"]:
-            if candidate in df.columns:
-                code_col = candidate
-                break
-        if code_col is None:
-            # Try partial match
-            for col in df.columns:
-                col_str = str(col).lower()
-                if "code" in col_str and ("com" in col_str or "insee" in col_str or "geo" in col_str):
-                    code_col = col
+        z = zipfile.ZipFile(tmp_path)
+        # Find the data CSV inside the zip (exclude metadata file)
+        data_name = None
+        for name in z.namelist():
+            lower = name.lower()
+            if lower.endswith(".csv") and "metadata" not in lower:
+                if "_data" in lower or lower.endswith("_data.csv"):
+                    data_name = name
                     break
-
-        if code_col is None:
-            print(f"  WARNING: Could not find commune code column in revenus data", file=sys.stderr)
-            print(f"  Available columns: {list(df.columns)}", file=sys.stderr)
+        if data_name is None:
+            # Fallback: take the largest CSV (skip metadata)
+            csv_files = [n for n in z.namelist()
+                         if n.endswith(".csv") and "metadata" not in n.lower()]
+            if csv_files:
+                data_name = max(csv_files, key=lambda n: z.getinfo(n).file_size)
+        if data_name is None:
+            # Last resort: take the largest CSV overall
+            csv_files = [n for n in z.namelist() if n.endswith(".csv")]
+            if csv_files:
+                data_name = max(csv_files, key=lambda n: z.getinfo(n).file_size)
+        if data_name is None:
+            print("  WARNING: No CSV data file found in zip", file=sys.stderr)
             return {}
 
-        # Find median income column
-        rev_col = None
-        for candidate in ["Q213", "q213", "MED13", "med13", "Mediane", "mediane",
-                          "revenu_median", "Revenu median", "NBMENFISC13",
-                          "Niveau de vie Commune"]:
-            if candidate in df.columns:
-                rev_col = candidate
-                break
-        if rev_col is None:
-            for col in df.columns:
-                col_str = str(col).lower()
-                if "med" in col_str or "revm" in col_str or "q2" in col_str or "niveau" in col_str:
-                    rev_col = col
-                    break
-
-        # Find poverty rate column
-        pauv_col = None
-        for candidate in ["TP6013", "tp6013", "tx_pauvrete", "Taux de pauvrete",
-                          "taux_pauvrete", "PAUV", "Taux pauvrete"]:
-            if candidate in df.columns:
-                pauv_col = candidate
-                break
-        if pauv_col is None:
-            for col in df.columns:
-                col_str = str(col).lower()
-                if "pauv" in col_str or "poverty" in col_str:
-                    pauv_col = col
-                    break
-
-        print(f"  Using columns: code={code_col}, revenu={rev_col}, pauvrete={pauv_col}", file=sys.stderr)
-
-        if rev_col is None and pauv_col is None:
-            print(f"  WARNING: No income or poverty columns found", file=sys.stderr)
-            return {}
+        print(f"  Reading {data_name}...", file=sys.stderr)
 
         result = {}
-        for _, row in df.iterrows():
-            code = str(row[code_col]).strip()
-            if not code or code == "nan":
-                continue
-            if code.isdigit():
-                code = code.zfill(5)
+        rows_read = 0
 
-            rec = {}
-            if rev_col is not None:
-                v = safe_float(row[rev_col])
-                if v is not None:
-                    rec["rev_med"] = round(v)
-            if pauv_col is not None:
-                v = safe_float(row[pauv_col])
-                if v is not None:
-                    rec["tx_pauv"] = round(v, 1)
+        with z.open(data_name) as f:
+            reader = csv.DictReader(
+                io.TextIOWrapper(f, encoding="utf-8"), delimiter=";"
+            )
+            for row in reader:
+                rows_read += 1
 
-            if rec:
-                result[code] = rec
+                # Only keep commune-level rows
+                if row.get("GEO_OBJECT") != "COM":
+                    continue
 
-        print(f"  Revenus: {len(result)} communes with data", file=sys.stderr)
+                measure = row.get("FILOSOFI_MEASURE", "")
+                if measure not in ("MED_SL", "PR_MD60"):
+                    continue
+
+                code = row.get("GEO", "").strip()
+                if not code:
+                    continue
+                if code.isdigit():
+                    code = code.zfill(5)
+
+                val_str = row.get("OBS_VALUE", "").strip()
+                if not val_str:
+                    continue
+                v = safe_float(val_str)
+                if v is None:
+                    continue
+
+                if code not in result:
+                    result[code] = {}
+
+                if measure == "MED_SL":
+                    result[code]["rev_med"] = round(v)
+                elif measure == "PR_MD60":
+                    result[code]["tx_pauv"] = round(v, 1)
+
+        rev_count = sum(1 for r in result.values() if "rev_med" in r)
+        pauv_count = sum(1 for r in result.values() if "tx_pauv" in r)
+        print(f"  Revenus: {rows_read} rows read, {len(result)} communes with data", file=sys.stderr)
+        print(f"    rev_med: {rev_count} communes, tx_pauv: {pauv_count} communes", file=sys.stderr)
         return result
 
     except Exception as e:
@@ -311,7 +310,7 @@ def main():
     # --- Source 2: DGFiP comptes ---
     comptes = parse_comptes()
 
-    # --- Source 3: Revenus Filosofi (optional) ---
+    # --- Source 3: Revenus Filosofi 2021 ---
     revenus = parse_revenus()
 
     # --- Merge all sources ---

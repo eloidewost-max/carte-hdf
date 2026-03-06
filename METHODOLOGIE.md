@@ -234,7 +234,7 @@ Donnees socio-economiques et de politique de la ville utilisees pour enrichir le
 |--------|--------|-------|--------|----------|-----|
 | QPV (Quartiers Prioritaires) | ANCT | 2024 | CSV | 843 | [data.gouv.fr](https://www.data.gouv.fr/fr/datasets/quartiers-prioritaires-de-la-politique-de-la-ville-qpv/) |
 | Comptes individuels communes | DGFiP (Min. Economie) | 2022 | JSON | ~35 000 | [data.economie.gouv.fr](https://data.economie.gouv.fr/explore/dataset/comptes-individuels-des-communes-fichier-global-2022/) |
-| Revenus medians | Filosofi / INSEE | 2013 | XLSX | ~33 000 | [data.gouv.fr](https://www.data.gouv.fr/fr/datasets/revenus-des-francais-a-la-commune/) |
+| Revenus medians | Filosofi / INSEE | 2021 | CSV (zip) | ~31 000 | [data.gouv.fr](https://www.data.gouv.fr/fr/datasets/principaux-indicateurs-sur-la-pauvrete-en-2021-niveau-de-vie-taux-de-pauvrete-part-des-menages-imposes-et-decomposition-du-revenu-disponible) |
 
 ### Contenu par commune
 
@@ -245,8 +245,8 @@ Donnees socio-economiques et de politique de la ville utilisees pour enrichir le
 | `dette_hab` | Dette par habitant (EUR) | DGFiP 2022 | 666.7 |
 | `cafn_hab` | Capacite d'autofinancement nette par habitant (EUR) | DGFiP 2022 | -17.3 |
 | `perso_hab` | Charges de personnel par habitant (EUR) | DGFiP 2022 | 452.2 |
-| `rev_med` | Revenu median par unite de consommation (EUR) | Filosofi 2013 | 19 554 |
-| `tx_pauv` | Taux de pauvrete (%) | Filosofi 2013 | 15.2 |
+| `rev_med` | Revenu median par unite de consommation (EUR) | Filosofi 2021 | 29 730 |
+| `tx_pauv` | Taux de pauvrete (%) | Filosofi 2021 | 16.0 |
 
 ### QPV — Quartiers Prioritaires de la Politique de la Ville
 
@@ -260,14 +260,14 @@ Dans l'interface :
 
 Les comptes individuels du Ministere de l'Economie (DGFiP) fournissent les indicateurs financiers par habitant. Le fichier source utilise un code departement (3 caracteres) + code commune (3 caracteres) qui sont concatenes pour reconstituer le code INSEE a 5 chiffres.
 
-### Revenus — Filosofi 2013
+### Revenus — Filosofi 2021
 
-Les revenus medians proviennent du dispositif Filosofi de l'INSEE. **Attention** : les donnees datent de **2013** (12-13 ans), ce qui constitue la source la plus ancienne du projet. Le taux de pauvrete n'est pas disponible dans le fichier utilise (colonne absente).
+Les revenus medians et taux de pauvrete proviennent du dispositif Filosofi de l'INSEE (millesime 2021). Le fichier source est un CSV long (une ligne par commune et par indicateur) distribue en zip via l'API INSEE/data.gouv.fr. Deux mesures sont extraites : `MED_SL` (niveau de vie median, EUR/an) et `PR_MD60` (taux de pauvrete a 60 % de la mediane, %). Le taux de pauvrete n'est disponible que pour les communes de taille suffisante (~4 350 communes) ; les petites communes sont soumises au secret statistique.
 
 ### Integration dans la fiche commune
 
 La fiche commune affiche une section "Contexte socio-economique" avec :
-- Revenu median (badge fraicheur orange — 2013)
+- Revenu median (badge fraicheur — 2021)
 - DGF, dette, CAF nette, charges de personnel par habitant (badges fraicheur jaune — 2022)
 - Badge QPV (si applicable)
 
@@ -526,7 +526,7 @@ Les sources plus recentes (delinquance, QPV, DGFiP) utilisent directement le cod
 | Stationnement payant | 226 communes | L'enquete GART 2019 est loin d'etre exhaustive (~800+ communes en realite) |
 | Surveillance | 12% des communes | Les communes sans PM ni ASVP sont absentes |
 | Delinquance | ~27% des communes | Seuil de diffusion SSMSI masque les petites communes |
-| Taux de pauvrete | 0 communes | Colonne absente dans le fichier Filosofi 2013 utilise |
+| Taux de pauvrete | ~4 350 communes | Secret statistique pour les petites communes (Filosofi 2021) |
 
 ### Donnees absentes qui seraient pertinentes
 
@@ -545,8 +545,8 @@ Les sources plus recentes (delinquance, QPV, DGFiP) utilisent directement le cod
 
 5. **Delinquance — seuil de diffusion** : les donnees sont masquees pour les petites communes, ce qui sur-represente les communes urbaines et moyennes dans les analyses
 6. **Delinquance — chiffre noir** : les faits enregistres ne representent qu'une fraction des faits reels, avec un taux de declaration tres variable selon le type de delit
-7. **Revenus obsoletes** : les donnees Filosofi datent de 2013 (12-13 ans). L'evolution des revenus depuis peut etre significative, notamment dans les zones en gentrification ou en declin
-8. **Paris/Lyon/Marseille** : les revenus et certaines donnees sont absents car ces communes utilisent des codes d'arrondissements incompatibles avec le code commune global
+7. **Taux de pauvrete partiel** : le taux de pauvrete (Filosofi 2021) n'est disponible que pour ~4 350 communes de taille suffisante en raison du secret statistique
+8. **Paris/Lyon/Marseille** : certaines donnees financieres peuvent etre absentes car ces communes utilisent des codes d'arrondissements incompatibles avec le code commune global
 
 ### Fraicheur des donnees
 
@@ -562,9 +562,9 @@ Les sources plus recentes (delinquance, QPV, DGFiP) utilisent directement le cod
 | Delinquance | 2024 | 1-2 ans |
 | QPV | 2024 | 1-2 ans |
 | Comptes communes (DGFiP) | 2022 | 3-4 ans |
-| Revenus medians (Filosofi) | 2013 | 12-13 ans |
+| Revenus medians (Filosofi) | 2021 | 4-5 ans |
 
-Les prochaines municipales (2026) rendront les nuances politiques obsoletes. Les revenus Filosofi 2013 sont la donnee la plus ancienne du projet.
+Les prochaines municipales (2026) rendront les nuances politiques obsoletes. Le stationnement payant (GART 2019) est la donnee la plus ancienne du projet.
 
 L'interface affiche des **badges de fraicheur** colores pour chaque source : vert (< 2 ans), jaune (2-5 ans), orange (> 5 ans).
 
