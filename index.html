@@ -84,7 +84,6 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 .prospect-score { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 24px; text-align: right; }
 .prospect-bar { width: 40px; height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
 .prospect-bar-fill { height: 100%; border-radius: 3px; }
-.prospect-signals { display: flex; gap: 3px; font-size: 11px; color: #555; }
 .prospect-more { padding: 10px 16px; text-align: center; font-size: 12px; color: #4ecdc4; cursor: pointer; }
 .prospect-more:hover { background: rgba(255,255,255,0.04); }
 
@@ -99,7 +98,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 #info-metric { color: #8b8f98; }
 
 /* --- Detail Panel (right overlay) --- */
-#detail-panel { position: absolute; top: 0; right: 0; bottom: 0; width: 400px; background: #111318; border-left: 1px solid rgba(255,255,255,0.06); box-shadow: -8px 0 24px rgba(0,0,0,0.3); z-index: 150; overflow-y: auto; transform: translateX(100%); transition: transform 0.2s ease; }
+#detail-panel { position: fixed; top: 44px; right: 0; bottom: 28px; width: 400px; background: #111318; border-left: 1px solid rgba(255,255,255,0.06); box-shadow: -8px 0 24px rgba(0,0,0,0.3); z-index: 1000; overflow-y: auto; transform: translateX(100%); transition: transform 0.2s ease; }
 #detail-panel.open { transform: translateX(0); }
 #detail-close { position: sticky; top: 0; display: flex; justify-content: flex-end; padding: 8px 12px; background: #111318; z-index: 1; }
 #detail-close button { background: none; border: none; color: #555; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
@@ -193,16 +192,16 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     <div id="cmd-content"></div>
   </div>
 
-  <div id="map">
-    <div id="detail-panel">
-      <div id="detail-close"><button title="Fermer">&times;</button></div>
-      <div id="detail-content"></div>
-    </div>
-  </div>
+  <div id="map"></div>
 
   <div id="bottom-bar">
     <span id="bottom-stats"></span>
   </div>
+</div>
+
+<div id="detail-panel">
+  <div id="detail-close"><button title="Fermer">&times;</button></div>
+  <div id="detail-content"></div>
 </div>
 
 <div id="info">
@@ -239,12 +238,26 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
   // Load data (parallel fetches)
   status.textContent = 'Telechargement des donnees...';
-  var results = await Promise.all([
-    fetch('maires.json').then(function(r) { return r.json(); }),
-    fetch('surveillance.json').then(function(r) { return r.json(); }),
-    fetch('prospection.json').then(function(r) { return r.json(); }),
-    fetch('communes-topo.json').then(function(r) { return r.json(); })
-  ]);
+  function fetchJSON(url) {
+    return fetch(url).then(function(r) {
+      if (!r.ok) throw new Error(url + ' : ' + r.status);
+      return r.json();
+    });
+  }
+  var results;
+  try {
+    results = await Promise.all([
+      fetchJSON('maires.json'),
+      fetchJSON('surveillance.json'),
+      fetchJSON('prospection.json'),
+      fetchJSON('communes-topo.json')
+    ]);
+  } catch (err) {
+    document.getElementById('load-text').textContent = 'Erreur de chargement';
+    status.textContent = err.message;
+    status.style.color = '#e74c3c';
+    return;
+  }
   var maires = results[0];
   var surv = results[1];
   var prosp = results[2];
@@ -555,16 +568,15 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   function showInfo(feature) {
     var code = feature.properties.codgeo;
     var m = maires[code];
-    if (!m) return;
 
-    infoName.textContent = m.n + ' (' + code + ')';
+    infoName.textContent = (m ? m.n : code) + ' (' + code + ')';
 
     // Key metric based on mode
     if (currentMode === 'prospection') {
       var score = computeProspScore(code);
       infoMetric.textContent = score !== null ? 'Score : ' + score + '/100' : 'Score : N/A';
     } else if (currentMode === 'politique') {
-      infoMetric.textContent = m.f + ' \u2014 ' + m.lb + ' (' + m.nu + ')';
+      infoMetric.textContent = m ? (m.f + ' \u2014 ' + m.lb + ' (' + m.nu + ')') : 'Pas de donnees';
     } else {
       var s = surv[code];
       if (s && s.r) {
@@ -894,6 +906,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
   function switchMode(mode) {
     currentMode = mode;
+    activeFilter = null;
     var btns = document.querySelectorAll('.mode-btn');
     for (var i = 0; i < btns.length; i++) {
       btns[i].classList.toggle('active', btns[i].getAttribute('data-mode') === mode);
@@ -1117,6 +1130,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   var prospListLimit = 200;
 
   function renderProspectList() {
+    prospListLimit = 200;
     var wrap = document.getElementById('prospect-list-wrap');
     if (!wrap) return;
     wrap.textContent = '';
@@ -1248,6 +1262,9 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
           if (layer) geoLayer.resetStyle(layer);
         });
         row.addEventListener('click', function() {
+          var prev = document.querySelector('.prospect-row.selected');
+          if (prev) prev.classList.remove('selected');
+          row.classList.add('selected');
           openDetail(c);
           var layer = layerByCode[c];
           if (layer) map.fitBounds(layer.getBounds(), { maxZoom: 13, padding: [50, 50] });
@@ -1506,6 +1523,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       var m = maires[code];
       if (!m || !s || s.r === undefined) continue;
       if (m.f === 'Non class\u00e9') continue;
+      if ((s.r || 0) < survFilters.ratioMin) continue;
       if (famStats[m.f]) {
         famStats[m.f].count++;
         famStats[m.f].totalRatio += (s.r || 0);
@@ -1866,7 +1884,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
     var startMatches = [];
     var containsMatches = [];
-    for (var i = 0; i < searchIndex.length && matches.length < 50; i++) {
+    for (var i = 0; i < searchIndex.length && (startMatches.length + containsMatches.length) < 50; i++) {
       var entry = searchIndex[i];
       var normalized = normalizeSearch(entry.name);
       if (normalized.indexOf(q) === 0) {
