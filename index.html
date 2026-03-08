@@ -220,7 +220,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/topojson-client@3.1.0/dist/topojson-client.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/topojson-client@3.1.0/dist/topojson-client.min.js" integrity="sha256-Jc0CrkhsxQY+AhWk5M+xXeg3AMh6xIusTVfcaq8+u4k=" crossorigin="anonymous"></script>
 <script>
 (async function() {
   var map = L.map('map', {
@@ -272,6 +272,15 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
   // Convert TopoJSON to GeoJSON
   var communesGeo = topojson.feature(topoData, topoData.objects.a_com2022);
+  topoData = null;
+
+  // Pre-allocated style objects for common cases (avoid 35k allocations per restyle)
+  var STYLE_NO_DATA = { fillColor: '#444', fillOpacity: 0.15, weight: 0.2, color: '#222', opacity: 0.5 };
+  var STYLE_FILTERED = { fillColor: '#333', fillOpacity: 0.15, weight: 0.2, color: '#111', opacity: 0.3 };
+  var STYLE_HIDDEN = { fillOpacity: 0, weight: 0, opacity: 0 };
+  var STYLE_NO_DATA_DASHED = { fillColor: '#2a2a3e', fillOpacity: 0.25, weight: 0.4, color: '#444', opacity: 0.5, dashArray: '2 4' };
+  var STYLE_BELOW_MIN = { fillColor: '#444', fillOpacity: 0.15, weight: 0.2, color: '#222', opacity: 0.3 };
+  var STYLE_ZERO_RATIO = { fillColor: '#1a1a2e', fillOpacity: 0.5, weight: 0.3, color: '#333', opacity: 0.4 };
 
   // Familles in display order
   var FAMILLES = [
@@ -332,14 +341,12 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   function getStylePolitique(feature) {
     var code = feature.properties.codgeo;
     var m = maires[code];
-    if (!m) return { fillColor: '#444', fillOpacity: 0.15, weight: 0.2, color: '#222', opacity: 0.5 };
+    if (!m) return STYLE_NO_DATA;
 
     var isNC = m.f === 'Non class\u00e9';
     var isFiltered = activeFilter && m.f !== activeFilter;
 
-    if (isFiltered) {
-      return { fillColor: '#333', fillOpacity: 0.15, weight: 0.2, color: '#111', opacity: 0.3 };
-    }
+    if (isFiltered) return STYLE_FILTERED;
 
     // Border encodes police municipale effectif
     var s = surv[code];
@@ -376,20 +383,16 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var m = maires[code];
 
     if (!s) {
-      if (survFilters.dataOnly) return { fillOpacity: 0, weight: 0, opacity: 0 };
-      return { fillColor: '#2a2a3e', fillOpacity: 0.25, weight: 0.4, color: '#444', opacity: 0.5, dashArray: '2 4' };
+      if (survFilters.dataOnly) return STYLE_HIDDEN;
+      return STYLE_NO_DATA_DASHED;
     }
 
     var ratio = s.r || 0;
 
-    if (ratio < survFilters.ratioMin)
-      return { fillColor: '#444', fillOpacity: 0.15, weight: 0.2, color: '#222', opacity: 0.3 };
-    if (activeFilter && m && m.f !== activeFilter)
-      return { fillColor: '#333', fillOpacity: 0.15, weight: 0.2, color: '#111', opacity: 0.3 };
+    if (ratio < survFilters.ratioMin) return STYLE_BELOW_MIN;
+    if (activeFilter && m && m.f !== activeFilter) return STYLE_FILTERED;
 
-    if (ratio === 0) {
-      return { fillColor: '#1a1a2e', fillOpacity: 0.5, weight: 0.3, color: '#333', opacity: 0.4 };
-    }
+    if (ratio === 0) return STYLE_ZERO_RATIO;
 
     return {
       fillColor: getThresholdColor(ratio, SURV_COLORS),
@@ -557,13 +560,12 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   function getStyleProspection(feature) {
     var code = feature.properties.codgeo;
     var p = prosp[code];
-    if (!p) return { fillColor: '#333', fillOpacity: 0.08, weight: 0.2, color: '#222', opacity: 0.3 };
+    if (!p) return STYLE_FILTERED;
 
-    if (!passesProspFilters(code))
-      return { fillColor: '#444', fillOpacity: 0.1, weight: 0.2, color: '#222', opacity: 0.3 };
+    if (!passesProspFilters(code)) return STYLE_BELOW_MIN;
 
     var score = computeProspScore(code);
-    if (score === null) return { fillColor: '#555', fillOpacity: 0.15, weight: 0.2, color: '#333', opacity: 0.3 };
+    if (score === null) return STYLE_BELOW_MIN;
 
     return {
       fillColor: getThresholdColor(score, PROSP_COLORS),
@@ -600,21 +602,17 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var m = maires[code];
 
     if (!d) {
-      if (secuFilters.dataOnly) return { fillOpacity: 0, weight: 0, opacity: 0 };
-      return { fillColor: '#2a2a3e', fillOpacity: 0.25, weight: 0.4, color: '#444', opacity: 0.5, dashArray: '2 4' };
+      if (secuFilters.dataOnly) return STYLE_HIDDEN;
+      return STYLE_NO_DATA_DASHED;
     }
 
     var ratio = getSecuRatio(code);
     if (ratio === null) ratio = 0;
 
-    if (ratio < secuFilters.ratioMin)
-      return { fillColor: '#444', fillOpacity: 0.15, weight: 0.2, color: '#222', opacity: 0.3 };
-    if (activeFilter && m && m.f !== activeFilter)
-      return { fillColor: '#333', fillOpacity: 0.15, weight: 0.2, color: '#111', opacity: 0.3 };
+    if (ratio < secuFilters.ratioMin) return STYLE_BELOW_MIN;
+    if (activeFilter && m && m.f !== activeFilter) return STYLE_FILTERED;
 
-    if (ratio === 0) {
-      return { fillColor: '#1a1a2e', fillOpacity: 0.5, weight: 0.3, color: '#333', opacity: 0.4 };
-    }
+    if (ratio === 0) return STYLE_ZERO_RATIO;
 
     return {
       fillColor: getThresholdColor(ratio, SECU_COLORS),
@@ -1099,10 +1097,10 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       }
 
       if (en.rev_med) {
-        addEcoRow('Revenu median', en.rev_med.toLocaleString('fr') + ' \u20ac', '2013', '#e67e22');
+        addEcoRow('Revenu median', en.rev_med.toLocaleString('fr') + ' \u20ac', '2021', '#f39c12');
       }
       if (en.tx_pauv !== undefined) {
-        addEcoRow('Taux de pauvrete', en.tx_pauv + ' %', '2013', '#e67e22');
+        addEcoRow('Taux de pauvrete', en.tx_pauv + ' %', '2021', '#f39c12');
       }
       if (en.dgf_hab !== undefined) {
         addEcoRow('DGF / habitant', en.dgf_hab.toFixed(1) + ' \u20ac', '2022', '#f39c12');
@@ -1397,6 +1395,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         scheduleProspRefresh();
         prospListLimit = 200;
         renderProspectList();
+        updateBottomBar();
       });
 
       row.appendChild(slider);
@@ -1744,12 +1743,16 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var sv1 = document.createElement('span');
     sv1.className = 'slider-value';
     sv1.textContent = survFilters.ratioMin.toString();
+    var survSliderTimer = null;
     sl1.addEventListener('input', function() {
       survFilters.ratioMin = parseInt(this.value, 10);
       sv1.textContent = survFilters.ratioMin.toString();
-      geoLayer.setStyle(getStyle);
-      renderSurvStats();
-      updateBottomBar();
+      if (survSliderTimer) clearTimeout(survSliderTimer);
+      survSliderTimer = setTimeout(function() {
+        geoLayer.setStyle(getStyle);
+        renderSurvStats();
+        updateBottomBar();
+      }, 50);
     });
     row1.appendChild(sl1);
     row1.appendChild(sv1);
@@ -1904,6 +1907,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         updateFilter();
         document.getElementById('cmd-content').textContent = '';
         renderCmdSurveillance();
+        updateBottomBar();
       });
 
       var td1 = document.createElement('td');
@@ -2038,12 +2042,16 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var sv1 = document.createElement('span');
     sv1.className = 'slider-value';
     sv1.textContent = secuFilters.ratioMin.toString();
+    var secuSliderTimer = null;
     sl1.addEventListener('input', function() {
       secuFilters.ratioMin = parseInt(this.value, 10);
       sv1.textContent = secuFilters.ratioMin.toString();
-      geoLayer.setStyle(getStyle);
-      renderSecuStats();
-      updateBottomBar();
+      if (secuSliderTimer) clearTimeout(secuSliderTimer);
+      secuSliderTimer = setTimeout(function() {
+        geoLayer.setStyle(getStyle);
+        renderSecuStats();
+        updateBottomBar();
+      }, 50);
     });
     row1.appendChild(sl1);
     row1.appendChild(sv1);
@@ -2187,6 +2195,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       updateFilter();
       document.getElementById('cmd-content').textContent = '';
       renderCmdSecurite();
+      updateBottomBar();
     });
     var tdAll1 = document.createElement('td');
     tdAll1.style.padding = '4px 6px';
@@ -2224,6 +2233,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         updateFilter();
         document.getElementById('cmd-content').textContent = '';
         renderCmdSecurite();
+        updateBottomBar();
       });
 
       var td1 = document.createElement('td');
@@ -2341,7 +2351,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         ['Delinquance', 'Min. Interieur', '2024', '~9 400 communes'],
         ['QPV', 'ANCT', '2024', '843 communes'],
         ['Comptes communes', 'DGFiP', '2022', '~35 000 communes'],
-        ['Revenus', 'Filosofi / INSEE', '2013', '~33 000 communes']
+        ['Revenus', 'Filosofi / INSEE', '2021', '~31 000 communes']
       ]
     );
 
@@ -2372,7 +2382,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       'Ratio PM plafonne a 50/10k (ecrase les differences entre communes tres dotees)',
       'Accidents corporels uniquement (exclut materiels et infractions sans accident)',
       'Delinquance : donnees masquees pour les petites communes (seuil de diffusion SSMSI)',
-      'Revenus : donnees de 2013 (Filosofi), potentiellement obsoletes',
+      'Revenus : donnees de 2021 (Filosofi)',
       'Paris/Lyon/Marseille : revenus absents (probleme d\'arrondissements)'
     ].forEach(function(text) {
       var li = document.createElement('li');
@@ -2395,7 +2405,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         ['Delinquance', '2024', freshSpan('1-2 ans', 'freshness-green')],
         ['QPV', '2024', freshSpan('1-2 ans', 'freshness-green')],
         ['Comptes communes', '2022', freshSpan('3-4 ans', 'freshness-yellow')],
-        ['Revenus medians', '2013', freshSpan('12-13 ans', 'freshness-orange')]
+        ['Revenus medians', '2021', freshSpan('4-5 ans', 'freshness-yellow')]
       ]
     );
 
@@ -2511,7 +2521,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   // Build search index from maires data
   var searchIndexedCodes = {};
   for (var code in maires) {
-    searchIndex.push({ code: code, name: maires[code].n, nameLower: maires[code].n.toLowerCase(), color: maires[code].cl });
+    searchIndex.push({ code: code, name: maires[code].n, nameNorm: normalizeSearch(maires[code].n), color: maires[code].cl });
     searchIndexedCodes[code] = true;
   }
 
@@ -2529,9 +2539,10 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       if (searchIndexedCodes[xCode]) continue;
       searchIndexedCodes[xCode] = true;
       var xName = xCode; // fallback: use INSEE code as name
-      searchIndex.push({ code: xCode, name: xName, nameLower: xName.toLowerCase(), color: '#666' });
+      searchIndex.push({ code: xCode, name: xName, nameNorm: normalizeSearch(xName), color: '#666' });
     }
   }
+  searchIndexedCodes = null;
 
   var searchActiveIdx = -1;
 
@@ -2551,7 +2562,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var containsMatches = [];
     for (var i = 0; i < searchIndex.length && (startMatches.length + containsMatches.length) < 50; i++) {
       var entry = searchIndex[i];
-      var normalized = normalizeSearch(entry.name);
+      var normalized = entry.nameNorm;
       if (normalized.indexOf(q) === 0) {
         startMatches.push(entry);
       } else if (normalized.indexOf(q) > 0 || entry.code.indexOf(q) === 0) {

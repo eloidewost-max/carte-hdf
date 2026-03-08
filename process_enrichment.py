@@ -217,76 +217,76 @@ def parse_revenus():
             with open(tmp_path, "wb") as out:
                 out.write(resp.read())
 
-        z = zipfile.ZipFile(tmp_path)
-        # Find the data CSV inside the zip (exclude metadata file)
-        data_name = None
-        for name in z.namelist():
-            lower = name.lower()
-            if lower.endswith(".csv") and "metadata" not in lower:
-                if "_data" in lower or lower.endswith("_data.csv"):
-                    data_name = name
-                    break
-        if data_name is None:
-            # Fallback: take the largest CSV (skip metadata)
-            csv_files = [n for n in z.namelist()
-                         if n.endswith(".csv") and "metadata" not in n.lower()]
-            if csv_files:
-                data_name = max(csv_files, key=lambda n: z.getinfo(n).file_size)
-        if data_name is None:
-            # Last resort: take the largest CSV overall
-            csv_files = [n for n in z.namelist() if n.endswith(".csv")]
-            if csv_files:
-                data_name = max(csv_files, key=lambda n: z.getinfo(n).file_size)
-        if data_name is None:
-            print("  WARNING: No CSV data file found in zip", file=sys.stderr)
-            return {}
+        with zipfile.ZipFile(tmp_path) as z:
+            # Find the data CSV inside the zip (exclude metadata file)
+            data_name = None
+            for name in z.namelist():
+                lower = name.lower()
+                if lower.endswith(".csv") and "metadata" not in lower:
+                    if "_data" in lower or lower.endswith("_data.csv"):
+                        data_name = name
+                        break
+            if data_name is None:
+                # Fallback: take the largest CSV (skip metadata)
+                csv_files = [n for n in z.namelist()
+                             if n.endswith(".csv") and "metadata" not in n.lower()]
+                if csv_files:
+                    data_name = max(csv_files, key=lambda n: z.getinfo(n).file_size)
+            if data_name is None:
+                # Last resort: take the largest CSV overall
+                csv_files = [n for n in z.namelist() if n.endswith(".csv")]
+                if csv_files:
+                    data_name = max(csv_files, key=lambda n: z.getinfo(n).file_size)
+            if data_name is None:
+                print("  WARNING: No CSV data file found in zip", file=sys.stderr)
+                return {}
 
-        print(f"  Reading {data_name}...", file=sys.stderr)
+            print(f"  Reading {data_name}...", file=sys.stderr)
 
-        result = {}
-        rows_read = 0
+            result = {}
+            rows_read = 0
 
-        with z.open(data_name) as f:
-            reader = csv.DictReader(
-                io.TextIOWrapper(f, encoding="utf-8"), delimiter=";"
-            )
-            for row in reader:
-                rows_read += 1
+            with z.open(data_name) as f:
+                reader = csv.DictReader(
+                    io.TextIOWrapper(f, encoding="utf-8"), delimiter=";"
+                )
+                for row in reader:
+                    rows_read += 1
 
-                # Only keep commune-level rows
-                if row.get("GEO_OBJECT") != "COM":
-                    continue
+                    # Only keep commune-level rows
+                    if row.get("GEO_OBJECT") != "COM":
+                        continue
 
-                measure = row.get("FILOSOFI_MEASURE", "")
-                if measure not in ("MED_SL", "PR_MD60"):
-                    continue
+                    measure = row.get("FILOSOFI_MEASURE", "")
+                    if measure not in ("MED_SL", "PR_MD60"):
+                        continue
 
-                code = row.get("GEO", "").strip()
-                if not code:
-                    continue
-                if code.isdigit():
-                    code = code.zfill(5)
+                    code = row.get("GEO", "").strip()
+                    if not code:
+                        continue
+                    if code.isdigit():
+                        code = code.zfill(5)
 
-                val_str = row.get("OBS_VALUE", "").strip()
-                if not val_str:
-                    continue
-                v = safe_float(val_str)
-                if v is None:
-                    continue
+                    val_str = row.get("OBS_VALUE", "").strip()
+                    if not val_str:
+                        continue
+                    v = safe_float(val_str)
+                    if v is None:
+                        continue
 
-                if code not in result:
-                    result[code] = {}
+                    if code not in result:
+                        result[code] = {}
 
-                if measure == "MED_SL":
-                    result[code]["rev_med"] = round(v)
-                elif measure == "PR_MD60":
-                    result[code]["tx_pauv"] = round(v, 1)
+                    if measure == "MED_SL":
+                        result[code]["rev_med"] = round(v)
+                    elif measure == "PR_MD60":
+                        result[code]["tx_pauv"] = round(v, 1)
 
-        rev_count = sum(1 for r in result.values() if "rev_med" in r)
-        pauv_count = sum(1 for r in result.values() if "tx_pauv" in r)
-        print(f"  Revenus: {rows_read} rows read, {len(result)} communes with data", file=sys.stderr)
-        print(f"    rev_med: {rev_count} communes, tx_pauv: {pauv_count} communes", file=sys.stderr)
-        return result
+            rev_count = sum(1 for r in result.values() if "rev_med" in r)
+            pauv_count = sum(1 for r in result.values() if "tx_pauv" in r)
+            print(f"  Revenus: {rows_read} rows read, {len(result)} communes with data", file=sys.stderr)
+            print(f"    rev_med: {rev_count} communes, tx_pauv: {pauv_count} communes", file=sys.stderr)
+            return result
 
     except Exception as e:
         print(f"  WARNING: Could not process revenus data: {e}", file=sys.stderr)

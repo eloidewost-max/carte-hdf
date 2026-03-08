@@ -6,6 +6,7 @@ et du RNE maires (elus-maires-mai.csv) pour les noms des maires.
 
 import csv
 import json
+import os
 
 # --- Mapping nuance → label lisible ---
 NUANCE_LABELS = {
@@ -62,11 +63,6 @@ def load_maires_names(path):
         reader = csv.DictReader(f, delimiter=";")
         for row in reader:
             code = row["Code de la commune"].strip()
-            dept = row["Code du département"].strip()
-            # Construire le code INSEE complet (dept + commune)
-            if len(dept) < 2:
-                dept = dept.zfill(2)
-            code_insee = dept + code[len(dept):]  # Le code commune inclut déjà le département
             prenom = row["Prénom de l'élu"].strip()
             nom = row["Nom de l'élu"].strip()
             # Formatter: Prénom Nom (capitalisation propre)
@@ -138,7 +134,7 @@ def main():
 
     print(f"\n  → {stats['total']} communes écrites dans maires.json")
     print(f"  → {stats['matched_maire']} communes avec nom du maire")
-    size_mb = len(open(output_path).read()) / 1024 / 1024
+    size_mb = os.path.getsize(output_path) / 1024 / 1024
     print(f"  → Taille: {size_mb:.1f} Mo")
 
     # Stats par famille
