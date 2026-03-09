@@ -548,25 +548,25 @@ Les sources plus recentes (delinquance, QPV, DGFiP) utilisent directement le cod
 7. **Taux de pauvrete partiel** : le taux de pauvrete (Filosofi 2021) n'est disponible que pour ~4 350 communes de taille suffisante en raison du secret statistique
 8. **Paris/Lyon/Marseille** : certaines donnees financieres peuvent etre absentes car ces communes utilisent des codes d'arrondissements incompatibles avec le code commune global
 
-### Fraicheur des donnees
+### Fraicheur des donnees (au 1er mars 2026)
 
-| Donnee | Annee | Age |
-|--------|-------|-----|
-| Population INSEE | 2021 | 4-5 ans |
-| PM courant | 2024 | 1-2 ans |
-| PM historique | 2019-2024 | a jour |
-| Stationnement payant | 2019 | 6-7 ans |
-| Videoverbalisation | 2025 | < 1 an |
-| Accidents | 2023-2024 | 1-2 ans |
-| Nuances politiques | 2020 | 5-6 ans |
-| Delinquance | 2024 | 1-2 ans |
-| QPV | 2024 | 1-2 ans |
-| Comptes communes (DGFiP) | 2022 | 3-4 ans |
-| Revenus medians (Filosofi) | 2021 | 4-5 ans |
+| Donnee | Annee | Age | Badge |
+|--------|-------|-----|-------|
+| Videoverbalisation | 2025 | ~1 an | 🟢 |
+| PM courant | 2024 | ~2 ans | 🟢 |
+| PM historique | 2019-2024 | a jour | 🟢 |
+| Accidents | 2023-2024 | ~2 ans | 🟢 |
+| Delinquance | 2024 | ~2 ans | 🟢 |
+| QPV | 2024 | ~2 ans | 🟢 |
+| Comptes communes (DGFiP) | 2022 | ~4 ans | 🟡 |
+| Population INSEE | 2021 | ~5 ans | 🟡 |
+| Revenus medians (Filosofi) | 2021 | ~5 ans | 🟡 |
+| Nuances politiques | 2020 | ~6 ans | 🟠 |
+| Stationnement payant | 2019 | ~7 ans | 🔴 |
 
-Les prochaines municipales (2026) rendront les nuances politiques obsoletes. Le stationnement payant (GART 2019) est la donnee la plus ancienne du projet.
+Les municipales de 2026 rendront les nuances politiques obsoletes — leur renouvellement sera a surveiller. Le stationnement payant (GART 2019) est la donnee la plus ancienne et la plus incomplete du projet.
 
-L'interface affiche des **badges de fraicheur** colores pour chaque source : vert (< 2 ans), jaune (2-5 ans), orange (> 5 ans).
+L'interface affiche des **badges de fraicheur** colores pour chaque source : vert (< 3 ans), jaune (3-5 ans), orange (5-7 ans), rouge (> 7 ans).
 
 ---
 

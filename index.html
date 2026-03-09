@@ -140,6 +140,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 .freshness-green { color: #4ecdc4; }
 .freshness-yellow { color: #f39c12; }
 .freshness-orange { color: #e8913a; }
+.freshness-red { color: #e74c3c; }
 
 /* --- Coverage banner --- */
 .coverage-banner { padding: 8px 12px; background: rgba(74,144,217,0.06); border-radius: 4px; font-size: 12px; color: #8b8f98; margin-bottom: 8px; border-left: 3px solid #4a90d9; }
@@ -806,8 +807,9 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
               yearEl.className = 'detail-signal-year';
               var yr = parseInt(sigDef.year, 10) || 0;
               if (yr >= 2023) yearEl.className += ' freshness-green';
-              else if (yr >= 2019) yearEl.className += ' freshness-yellow';
-              else yearEl.className += ' freshness-orange';
+              else if (yr >= 2021) yearEl.className += ' freshness-yellow';
+              else if (yr >= 2019) yearEl.className += ' freshness-orange';
+              else yearEl.className += ' freshness-red';
               yearEl.textContent = '(' + sigDef.year + ')';
               row.appendChild(yearEl);
             }
@@ -2336,9 +2338,9 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     makeTable(
       ['Mode', 'Donnees', 'Ce qu\'il montre'],
       [
+        ['Prospection', 'prospection.json', 'Score composite de potentiel videoverbalisation'],
         ['Politique', 'maires.json', 'Couleur politique du maire (municipales 2020)'],
         ['Surveillance', 'surveillance.json', 'Densite de police municipale (agents / 10k hab.)'],
-        ['Prospection', 'prospection.json', 'Score composite de potentiel videoverbalisation'],
         ['Securite', 'delinquance.json', 'Taux de delinquance enregistree / 10k hab.']
       ]
     );
@@ -2383,12 +2385,13 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var ol = document.createElement('ol');
     [
       'Biais en faveur des communes "moyennes" (signal taille = 25% du poids)',
-      'Sous-representation du stationnement payant (226 sur ~800+ reelles)',
+      'Sous-representation du stationnement payant (226 sur ~800+ reelles, donnee la plus ancienne ~7 ans)',
       'Ratio PM plafonne a 50/10k (ecrase les differences entre communes tres dotees)',
       'Accidents corporels uniquement (exclut materiels et infractions sans accident)',
       'Delinquance : donnees masquees pour les petites communes (seuil de diffusion SSMSI)',
-      'Revenus : donnees de 2021 (Filosofi)',
-      'Paris/Lyon/Marseille : revenus absents (probleme d\'arrondissements)'
+      'Delinquance : faits enregistres \u2260 faits commis (chiffre noir variable selon les categories)',
+      'Taux de pauvrete partiel : ~4 350 communes seulement (secret statistique Filosofi 2021)',
+      'Paris/Lyon/Marseille : certaines donnees absentes (probleme d\'arrondissements)'
     ].forEach(function(text) {
       var li = document.createElement('li');
       li.textContent = text;
@@ -2400,17 +2403,17 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     makeTable(
       ['Donnee', 'Annee', 'Etat'],
       [
-        ['Population INSEE', '2021', freshSpan('4-5 ans', 'freshness-yellow')],
-        ['PM courant', '2024', freshSpan('1-2 ans', 'freshness-green')],
+        ['Videoverbalisation', '2025', freshSpan('~1 an', 'freshness-green')],
+        ['PM courant', '2024', freshSpan('~2 ans', 'freshness-green')],
         ['PM historique', '2019-2024', freshSpan('a jour', 'freshness-green')],
-        ['Stationnement payant', '2019', freshSpan('6-7 ans', 'freshness-orange')],
-        ['Videoverbalisation', '2025', freshSpan('< 1 an', 'freshness-green')],
-        ['Accidents', '2023-2024', freshSpan('1-2 ans', 'freshness-green')],
-        ['Nuances politiques', '2020', freshSpan('5-6 ans', 'freshness-orange')],
-        ['Delinquance', '2024', freshSpan('1-2 ans', 'freshness-green')],
-        ['QPV', '2024', freshSpan('1-2 ans', 'freshness-green')],
-        ['Comptes communes', '2022', freshSpan('3-4 ans', 'freshness-yellow')],
-        ['Revenus medians', '2021', freshSpan('4-5 ans', 'freshness-yellow')]
+        ['Accidents', '2023-2024', freshSpan('~2 ans', 'freshness-green')],
+        ['Delinquance', '2024', freshSpan('~2 ans', 'freshness-green')],
+        ['QPV', '2024', freshSpan('~2 ans', 'freshness-green')],
+        ['Comptes communes', '2022', freshSpan('~4 ans', 'freshness-yellow')],
+        ['Population INSEE', '2021', freshSpan('~5 ans', 'freshness-yellow')],
+        ['Revenus medians', '2021', freshSpan('~5 ans', 'freshness-yellow')],
+        ['Nuances politiques', '2020', freshSpan('~6 ans', 'freshness-orange')],
+        ['Stationnement payant', '2019', freshSpan('~7 ans', 'freshness-red')]
       ]
     );
 
