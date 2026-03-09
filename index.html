@@ -128,11 +128,6 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 .bench-table th { text-align: left; color: #555; font-weight: 600; padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.06); }
 .bench-table td { padding: 4px 6px; color: #b0b3ba; }
 .bench-table .bench-val { color: #e2e4e9; font-weight: 600; }
-.bench-bar-bg { height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; flex: 1; overflow: hidden; }
-.bench-bar-fill { height: 100%; border-radius: 2px; }
-.bench-bar-green { background: #27ae60; }
-.bench-bar-orange { background: #f39c12; }
-.bench-bar-red { background: #e74c3c; }
 .bench-pct { min-width: 50px; text-align: right; font-size: 10px; font-weight: 600; }
 .bench-pct-high { color: #e74c3c; }
 .bench-pct-mid { color: #f39c12; }
@@ -268,6 +263,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   }
   var results;
   try {
+    var insightsP = fetchJSON('insights.json').catch(function(e) { console.warn('insights.json non disponible :', e.message); return {}; });
     results = await Promise.all([
       fetchJSON('maires.json'),
       fetchJSON('surveillance.json'),
@@ -275,7 +271,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       fetchJSON('communes-topo.json'),
       fetchJSON('delinquance.json'),
       fetchJSON('enrichment.json'),
-      fetchJSON('insights.json')
+      insightsP
     ]);
   } catch (err) {
     document.getElementById('load-text').textContent = 'Erreur de chargement';
@@ -304,6 +300,20 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   var STYLE_NO_DATA_DASHED = { fillColor: '#2a2a3e', fillOpacity: 0.25, weight: 0.4, color: '#444', opacity: 0.5, dashArray: '2 4' };
   var STYLE_BELOW_MIN = { fillColor: '#444', fillOpacity: 0.15, weight: 0.2, color: '#222', opacity: 0.3, dashArray: null };
   var STYLE_ZERO_RATIO = { fillColor: '#1a1a2e', fillOpacity: 0.5, weight: 0.3, color: '#333', opacity: 0.4, dashArray: null };
+
+  var BENCH_LABELS = {
+    crime_r: 'Criminalite /10k',
+    pm_r: 'Police mun. /10k',
+    accidents_r: 'Accidents /10k',
+    rev_med: 'Revenu median',
+    tx_pauv: 'Taux pauvrete'
+  };
+  var BENCH_ORDER = ['crime_r', 'pm_r', 'accidents_r', 'rev_med', 'tx_pauv'];
+  function fmtBenchVal(key, v) {
+    if (key === 'rev_med') return v.toLocaleString('fr') + ' \u20ac';
+    if (key === 'tx_pauv') return v + ' %';
+    return v;
+  }
 
   // Familles in display order
   var FAMILLES = [
@@ -966,32 +976,22 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         table.appendChild(thead);
 
         var tbody = document.createElement('tbody');
-        var benchLabels = {
-          crime_r: 'Criminalite /10k',
-          pm_r: 'Police mun. /10k',
-          accidents_r: 'Accidents /10k',
-          rev_med: 'Revenu median',
-          tx_pauv: 'Taux pauvrete'
-        };
-        var benchOrder = ['crime_r', 'pm_r', 'accidents_r', 'rev_med', 'tx_pauv'];
-        benchOrder.forEach(function(key) {
+        BENCH_ORDER.forEach(function(key) {
           if (!bench[key]) return;
           var bv = bench[key];
           var tr = document.createElement('tr');
 
           var tdLabel = document.createElement('td');
-          tdLabel.textContent = benchLabels[key] || key;
+          tdLabel.textContent = BENCH_LABELS[key] || key;
           tr.appendChild(tdLabel);
 
           var tdVal = document.createElement('td');
           tdVal.className = 'bench-val';
-          tdVal.textContent = (key === 'rev_med') ? bv.val.toLocaleString('fr') + ' \u20ac' :
-                              (key === 'tx_pauv') ? bv.val + ' %' : bv.val;
+          tdVal.textContent = fmtBenchVal(key, bv.val);
           tr.appendChild(tdVal);
 
           var tdMed = document.createElement('td');
-          tdMed.textContent = (key === 'rev_med') ? bv.med.toLocaleString('fr') + ' \u20ac' :
-                              (key === 'tx_pauv') ? bv.med + ' %' : bv.med;
+          tdMed.textContent = fmtBenchVal(key, bv.med);
           tr.appendChild(tdMed);
 
           var tdPct = document.createElement('td');
@@ -1359,10 +1359,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   // --- Detail panel close ---
   document.querySelector('#detail-close button').addEventListener('click', function() {
     document.getElementById('detail-panel').classList.remove('open');
-    var params = new URLSearchParams(window.location.search);
-    params.delete('commune');
-    var qs = params.toString();
-    history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+    updateURLWithCommune(null);
   });
 
   // Create GeoJSON layer
