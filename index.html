@@ -178,6 +178,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   #search-box { width: 180px; }
   .mode-btn { padding: 5px 12px; font-size: 12px; }
 }
+.bascule-glow { filter: drop-shadow(0 0 6px rgba(255,255,255,0.8)) drop-shadow(0 0 2px rgba(255,255,255,0.6)); }
+.mun2026-transition .leaflet-overlay-pane svg path { transition: fill 300ms ease, fill-opacity 300ms ease, stroke 300ms ease; }
 </style>
 </head>
 <body>
@@ -200,6 +202,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       <button class="mode-btn" data-mode="politique">Politique</button>
       <button class="mode-btn" data-mode="surveillance">Surveillance</button>
       <button class="mode-btn" data-mode="securite">Securite</button>
+      <button class="mode-btn" data-mode="municipales2026">Municipales 2026</button>
       <div id="mode-indicator"></div>
     </div>
     <button id="btn-methodo" title="Methodologie et sources">?</button>
@@ -264,6 +267,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   var results;
   try {
     var insightsP = fetchJSON('insights.json').catch(function(e) { console.warn('insights.json non disponible :', e.message); return {}; });
+    var mun2026P = fetchJSON('municipales2026.json').catch(function(e) { console.warn('municipales2026.json non disponible :', e.message); return {}; });
     results = await Promise.all([
       fetchJSON('maires.json'),
       fetchJSON('surveillance.json'),
@@ -271,7 +275,8 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       fetchJSON('communes-topo.json'),
       fetchJSON('delinquance.json'),
       fetchJSON('enrichment.json'),
-      insightsP
+      insightsP,
+      mun2026P
     ]);
   } catch (err) {
     document.getElementById('load-text').textContent = 'Erreur de chargement';
@@ -286,6 +291,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   var delinq = results[4];
   var enrich = results[5];
   var insights = results[6];
+  mun2026 = results[7];
 
   status.textContent = 'Construction de la carte...';
 
@@ -338,6 +344,10 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   // --- State ---
   var activeFilter = null;
   var currentMode = 'prospection';
+  var mun2026 = null;
+  var mun2026Year = '2026';
+  var mun2026Filter = null;
+  var mun2026BlocFilter = null;
   var secuFilter = null;
   var secuFilters = { ratioMin: 0, dataOnly: false };
 
@@ -375,6 +385,11 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var params = new URLSearchParams();
     if (currentMode !== 'prospection') params.set('mode', currentMode);
     if (activeFilter) params.set('filter', activeFilter);
+    if (currentMode === 'municipales2026') {
+      if (mun2026Year === '2020') params.set('year', '2020');
+      if (mun2026Filter) params.set('filter', mun2026Filter);
+      if (mun2026BlocFilter) params.set('bloc', mun2026BlocFilter);
+    }
     var qs = params.toString();
     var url = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
     history.replaceState(null, '', url);
@@ -396,7 +411,9 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     return {
       mode: params.get('mode') || 'prospection',
       commune: params.get('commune') || null,
-      filter: params.get('filter') || null
+      filter: params.get('filter') || null,
+      year: params.get('year') || null,
+      bloc: params.get('bloc') || null
     };
   }
 
@@ -694,10 +711,55 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   }
 
   // Style dispatcher
+  // Style function -- municipales 2026 mode
+  function getStyleMunicipales2026(feature) {
+    var code = feature.properties.c;
+    var d = mun2026 ? mun2026[code] : null;
+    if (!d) return STYLE_NO_DATA;
+    var bloc = mun2026Year === '2020' ? (d.b20 || 'Sans étiquette') : (d.b26 || 'Sans étiquette');
+    if (mun2026BlocFilter && bloc !== mun2026BlocFilter) return STYLE_FILTERED;
+    if (mun2026Filter === 'bascules' && d.cb !== 1) return STYLE_FILTERED;
+    if (mun2026Filter === 'nouveaux' && d.nm !== 1) return STYLE_FILTERED;
+    if (mun2026Filter === 't2' && d.st !== 'T2') return STYLE_FILTERED;
+    var fillColor = mun2026Year === '2020' ? (d.cl20 || '#666') : (d.cl26 || '#666');
+    if (d.st === 'T2' && mun2026Year === '2026') {
+      return { fillColor: fillColor, fillOpacity: 0.6, weight: 0.5, color: '#888', opacity: 0.6, dashArray: '4 4' };
+    }
+    if (d.cb === 1 && mun2026Year === '2026') {
+      return { fillColor: fillColor, fillOpacity: 0.85, weight: 2.5, color: '#FFFFFF', opacity: 0.9, dashArray: null };
+    }
+    return { fillColor: fillColor, fillOpacity: 0.75, weight: 0.3, color: '#555', opacity: 0.5, dashArray: null };
+  }
+
+  // Apply/remove bascule glow CSS class on shift communes
+  function applyBasculeGlow() {
+    if (!mun2026) return;
+    var isGlow = (currentMode === 'municipales2026' && mun2026Year === '2026');
+    for (var code in layerByCode) {
+      var layer = layerByCode[code];
+      if (!layer._path) continue;
+      var d = mun2026[code];
+      if (d && d.cb === 1 && isGlow) {
+        if (mun2026BlocFilter) {
+          var bloc = d.b26 || 'Sans étiquette';
+          if (bloc !== mun2026BlocFilter) { layer._path.classList.remove('bascule-glow'); continue; }
+        }
+        if (mun2026Filter && mun2026Filter !== 'bascules') {
+          if (mun2026Filter === 'nouveaux' && d.nm !== 1) { layer._path.classList.remove('bascule-glow'); continue; }
+          if (mun2026Filter === 't2' && d.st !== 'T2') { layer._path.classList.remove('bascule-glow'); continue; }
+        }
+        layer._path.classList.add('bascule-glow');
+      } else {
+        layer._path.classList.remove('bascule-glow');
+      }
+    }
+  }
+
   function getStyle(feature) {
     if (currentMode === 'surveillance') return getStyleSurveillance(feature);
     if (currentMode === 'prospection') return getStyleProspection(feature);
     if (currentMode === 'securite') return getStyleSecurite(feature);
+    if (currentMode === 'municipales2026') return getStyleMunicipales2026(feature);
     return getStylePolitique(feature);
   }
 
@@ -1353,6 +1415,117 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     }
     if (hasMissing) content.appendChild(missSec);
 
+    // --- Municipales 2026 section ---
+    var md = mun2026 ? mun2026[code] : null;
+    if (md) {
+      var munSec = document.createElement('div');
+      munSec.style.cssText = 'border-top:1px solid #333;padding-top:12px;margin-top:12px;';
+      var munTitle = document.createElement('div');
+      munTitle.style.cssText = 'font-size:11px;font-weight:700;color:#8E24AA;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;';
+      munTitle.textContent = 'Municipales 2026';
+      munSec.appendChild(munTitle);
+
+      if (md.ms) {
+        var sortantDiv = document.createElement('div');
+        sortantDiv.style.cssText = 'margin-bottom:8px;';
+        var sortantLabel = document.createElement('div');
+        sortantLabel.style.cssText = 'font-size:10px;color:#888;margin-bottom:2px;';
+        sortantLabel.textContent = 'Maire sortant (2020)';
+        sortantDiv.appendChild(sortantLabel);
+        var sortantName = document.createElement('div');
+        sortantName.style.cssText = 'font-size:13px;color:#ddd;';
+        sortantName.textContent = md.ms + (md.n20 ? ' \u2014 ' + md.n20 : '');
+        sortantDiv.appendChild(sortantName);
+        if (md.b20) {
+          var sortantBloc = document.createElement('span');
+          sortantBloc.style.cssText = 'display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;margin-top:2px;color:#fff;background:' + (md.cl20 || '#666') + ';';
+          sortantBloc.textContent = md.b20;
+          sortantDiv.appendChild(sortantBloc);
+        }
+        munSec.appendChild(sortantDiv);
+      }
+
+      var resDiv = document.createElement('div');
+      resDiv.style.cssText = 'margin-bottom:8px;padding:8px;background:rgba(255,255,255,0.03);border-radius:4px;';
+      var resLabel = document.createElement('div');
+      resLabel.style.cssText = 'font-size:10px;color:#888;margin-bottom:4px;';
+      resLabel.textContent = 'R\u00e9sultat T1 2026';
+      resDiv.appendChild(resLabel);
+
+      if (md.vt1) {
+        var winDiv = document.createElement('div');
+        winDiv.style.cssText = 'font-size:13px;color:#eee;font-weight:600;';
+        winDiv.textContent = '\u25B6 ' + md.vt1 + (md.sc ? ' \u2014 ' + md.sc + '%' : '');
+        resDiv.appendChild(winDiv);
+        if (md.lt1) {
+          var listeDiv = document.createElement('div');
+          listeDiv.style.cssText = 'font-size:11px;color:#999;margin:2px 0;padding-left:14px;';
+          listeDiv.textContent = md.lt1;
+          resDiv.appendChild(listeDiv);
+        }
+        if (md.b26) {
+          var winBloc = document.createElement('span');
+          winBloc.style.cssText = 'display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;margin:2px 0 2px 14px;color:#fff;background:' + (md.cl26 || '#666') + ';';
+          winBloc.textContent = md.b26 + (md.n26 ? ' (' + md.n26 + ')' : '');
+          resDiv.appendChild(winBloc);
+        }
+        if (md.st === 'T2') {
+          var t2Badge = document.createElement('span');
+          t2Badge.style.cssText = 'display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;margin-left:6px;background:#555;color:#ddd;border:1px dashed #888;';
+          t2Badge.textContent = 'Second tour';
+          resDiv.appendChild(t2Badge);
+        }
+      }
+
+      if (md.s2) {
+        var secDiv = document.createElement('div');
+        secDiv.style.cssText = 'font-size:12px;color:#999;margin-top:6px;';
+        secDiv.textContent = '\u25B7 ' + md.s2 + (md.sc2 ? ' \u2014 ' + md.sc2 + '%' : '');
+        resDiv.appendChild(secDiv);
+        if (md.sc && md.sc2) {
+          var margeDiv = document.createElement('div');
+          margeDiv.style.cssText = 'font-size:11px;color:#777;padding-left:14px;';
+          margeDiv.textContent = 'Marge : +' + (md.sc - md.sc2).toFixed(1) + ' pts';
+          resDiv.appendChild(margeDiv);
+        }
+      }
+      munSec.appendChild(resDiv);
+
+      if (md.pa) {
+        var partDiv = document.createElement('div');
+        partDiv.style.cssText = 'font-size:12px;color:#aaa;margin-bottom:8px;';
+        partDiv.textContent = 'Participation : ' + md.pa + '%';
+        munSec.appendChild(partDiv);
+      }
+
+      var statusDiv = document.createElement('div');
+      statusDiv.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;';
+      if (md.cb === 1 && md.sb) {
+        var bascBadge = document.createElement('span');
+        bascBadge.style.cssText = 'padding:2px 8px;border-radius:3px;font-size:11px;background:rgba(142,36,170,0.3);color:#CE93D8;border:1px solid #8E24AA;';
+        bascBadge.textContent = '\u2726 ' + md.sb;
+        statusDiv.appendChild(bascBadge);
+      } else if (md.cb === 0) {
+        var sameBadge = document.createElement('span');
+        sameBadge.style.cssText = 'padding:2px 8px;border-radius:3px;font-size:11px;background:rgba(255,255,255,0.05);color:#888;';
+        sameBadge.textContent = '\u2713 M\u00eame bord politique';
+        statusDiv.appendChild(sameBadge);
+      }
+      if (md.nm === 1) {
+        var newBadge = document.createElement('span');
+        newBadge.style.cssText = 'padding:2px 8px;border-radius:3px;font-size:11px;background:rgba(255,183,0,0.2);color:#FFB300;';
+        newBadge.textContent = '\u2605 Nouveau maire';
+        statusDiv.appendChild(newBadge);
+      } else if (md.nm === 0) {
+        var reconBadge = document.createElement('span');
+        reconBadge.style.cssText = 'padding:2px 8px;border-radius:3px;font-size:11px;background:rgba(255,255,255,0.05);color:#888;';
+        reconBadge.textContent = '\u2713 Sortant reconduit';
+        statusDiv.appendChild(reconBadge);
+      }
+      if (statusDiv.children.length > 0) munSec.appendChild(statusDiv);
+      content.appendChild(munSec);
+    }
+
     panel.classList.add('open');
   }
 
@@ -1396,7 +1569,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   }
 
   // --- Mode toggle ---
-  var MODE_COLORS = { politique: '#4a90d9', surveillance: '#e8913a', prospection: '#4ecdc4', securite: '#c0392b' };
+  var MODE_COLORS = { politique: '#4a90d9', surveillance: '#e8913a', prospection: '#4ecdc4', securite: '#c0392b', municipales2026: '#8E24AA' };
   var modeIndicator = document.getElementById('mode-indicator');
 
   function updateModeIndicator() {
@@ -1408,6 +1581,12 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   }
 
   function switchMode(mode) {
+    // Remove bascule glow when leaving municipales mode
+    if (currentMode === 'municipales2026') {
+      document.getElementById('map').classList.remove('mun2026-transition');
+      var glows = document.querySelectorAll('.bascule-glow');
+      for (var g = 0; g < glows.length; g++) glows[g].classList.remove('bascule-glow');
+    }
     currentMode = mode;
     activeFilter = null;
     var btns = document.querySelectorAll('.mode-btn');
@@ -1425,11 +1604,17 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       secuFilter = null;
       secuFilters = { ratioMin: 0, dataOnly: false };
     }
+    if (mode === 'municipales2026') {
+      mun2026Filter = null;
+      mun2026BlocFilter = null;
+      mun2026Year = '2026';
+    }
 
     if (mode === 'prospection') renderCmdProspection();
     else if (mode === 'politique') renderCmdPolitique();
     else if (mode === 'surveillance') renderCmdSurveillance();
     else if (mode === 'securite') renderCmdSecurite();
+    else if (mode === 'municipales2026') renderCmdMunicipales2026();
 
     // Hide info tooltip
     infoPanel.style.display = 'none';
@@ -1441,6 +1626,9 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     updateModeIndicator();
     updateBottomBar();
     updateURL();
+    if (mode === 'municipales2026') {
+      setTimeout(applyBasculeGlow, 50);
+    }
   }
 
   var modeButtons = document.querySelectorAll('.mode-btn');
@@ -2639,6 +2827,201 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     mc.appendChild(ul);
   }
 
+  // --- Command panel: Municipales 2026 mode ---
+  var BLOC_COLORS_JS = {
+    'Extrême gauche': '#B71C1C', 'Gauche': '#E2001A', 'Centre': '#FFB300',
+    'Droite': '#0056A6', 'Extrême droite': '#0D1B4A', 'Divers': '#9E9E9E', 'Sans étiquette': '#666'
+  };
+  var MUN_BLOCS = [
+    { key: null, label: 'Tous', color: '#aaa' },
+    { key: 'Extrême gauche', label: 'Ext. gauche', color: '#B71C1C' },
+    { key: 'Gauche', label: 'Gauche', color: '#E2001A' },
+    { key: 'Centre', label: 'Centre', color: '#FFB300' },
+    { key: 'Droite', label: 'Droite', color: '#0056A6' },
+    { key: 'Extrême droite', label: 'Ext. droite', color: '#0D1B4A' },
+    { key: 'Divers', label: 'Divers', color: '#9E9E9E' },
+    { key: 'Sans étiquette', label: 'Sans étiq.', color: '#666' }
+  ];
+
+  function renderMun2026Legend() {
+    var legendDiv = document.getElementById('mun2026-legend');
+    if (!legendDiv) return;
+    legendDiv.textContent = '';
+    var title = document.createElement('div');
+    title.textContent = 'Légende';
+    title.style.cssText = 'font-size:11px;font-weight:600;color:#999;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;';
+    legendDiv.appendChild(title);
+    var counts = {};
+    var yearKey = mun2026Year === '2020' ? 'b20' : 'b26';
+    for (var code in mun2026) {
+      var d = mun2026[code];
+      if (mun2026Filter === 'bascules' && d.cb !== 1) continue;
+      if (mun2026Filter === 'nouveaux' && d.nm !== 1) continue;
+      if (mun2026Filter === 't2' && d.st !== 'T2') continue;
+      var bloc = d[yearKey] || 'Sans étiquette';
+      if (mun2026BlocFilter && bloc !== mun2026BlocFilter) continue;
+      counts[bloc] = (counts[bloc] || 0) + 1;
+    }
+    var order = ['Extrême gauche','Gauche','Centre','Droite','Extrême droite','Divers','Sans étiquette'];
+    order.forEach(function(bloc) {
+      if (!counts[bloc]) return;
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px;color:#bbb;';
+      var swatch = document.createElement('span');
+      swatch.style.cssText = 'display:inline-block;width:12px;height:12px;border-radius:2px;flex-shrink:0;background:' + (BLOC_COLORS_JS[bloc] || '#666') + ';';
+      row.appendChild(swatch);
+      var label = document.createElement('span');
+      label.style.cssText = 'flex:1;';
+      label.textContent = bloc;
+      row.appendChild(label);
+      var count = document.createElement('span');
+      count.style.cssText = 'color:#888;font-size:11px;';
+      count.textContent = counts[bloc].toLocaleString('fr');
+      row.appendChild(count);
+      legendDiv.appendChild(row);
+    });
+    // Legend notes
+    var notes = document.createElement('div');
+    notes.style.cssText = 'margin-top:8px;font-size:10px;color:#777;line-height:1.5;';
+    var dashNote = document.createElement('span');
+    dashNote.style.cssText = 'display:inline-block;width:12px;height:12px;border:1px dashed #888;margin-right:4px;vertical-align:middle;';
+    notes.appendChild(dashNote);
+    notes.appendChild(document.createTextNode(' En attente du T2'));
+    notes.appendChild(document.createElement('br'));
+    var glowNote = document.createElement('span');
+    glowNote.style.cssText = 'display:inline-block;width:12px;height:12px;border:2px solid #fff;border-radius:2px;margin-right:4px;vertical-align:middle;box-shadow:0 0 4px rgba(255,255,255,0.6);';
+    notes.appendChild(glowNote);
+    notes.appendChild(document.createTextNode(' Bascule politique'));
+    legendDiv.appendChild(notes);
+  }
+
+  function renderCmdMunicipales2026() {
+    var container = document.getElementById('cmd-content');
+    container.textContent = '';
+
+    // Year toggle
+    var toggleSection = document.createElement('div');
+    toggleSection.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:12px;padding:14px 10px;margin-bottom:10px;background:rgba(255,255,255,0.04);border-radius:6px;';
+    var label2020 = document.createElement('span');
+    label2020.textContent = '2020';
+    label2020.style.cssText = 'font-size:15px;font-weight:700;cursor:pointer;padding:4px 10px;border-radius:4px;transition:all 0.2s;';
+    var toggleTrack = document.createElement('div');
+    toggleTrack.style.cssText = 'width:50px;height:26px;border-radius:13px;background:#555;position:relative;cursor:pointer;transition:background 0.3s;';
+    var toggleThumb = document.createElement('div');
+    toggleThumb.style.cssText = 'width:22px;height:22px;border-radius:50%;background:#fff;position:absolute;top:2px;transition:left 0.3s;';
+    var label2026 = document.createElement('span');
+    label2026.textContent = '2026';
+    label2026.style.cssText = 'font-size:15px;font-weight:700;cursor:pointer;padding:4px 10px;border-radius:4px;transition:all 0.2s;';
+
+    function updateToggleVisual() {
+      if (mun2026Year === '2026') {
+        toggleThumb.style.left = '26px';
+        toggleTrack.style.background = '#8E24AA';
+        label2026.style.color = '#e2e4e9';
+        label2026.style.background = 'rgba(142,36,170,0.2)';
+        label2020.style.color = '#666';
+        label2020.style.background = 'transparent';
+      } else {
+        toggleThumb.style.left = '2px';
+        toggleTrack.style.background = '#555';
+        label2020.style.color = '#e2e4e9';
+        label2020.style.background = 'rgba(255,255,255,0.08)';
+        label2026.style.color = '#666';
+        label2026.style.background = 'transparent';
+      }
+    }
+
+    function doToggle() {
+      mun2026Year = mun2026Year === '2026' ? '2020' : '2026';
+      updateToggleVisual();
+      document.getElementById('map').classList.add('mun2026-transition');
+      geoLayer.setStyle(getStyle);
+      updateBottomBar();
+      updateURL();
+      setTimeout(function() {
+        applyBasculeGlow();
+        setTimeout(function() {
+          document.getElementById('map').classList.remove('mun2026-transition');
+        }, 350);
+      }, 150);
+      renderMun2026Legend();
+    }
+
+    toggleTrack.appendChild(toggleThumb);
+    label2020.addEventListener('click', function() { if (mun2026Year !== '2020') doToggle(); });
+    label2026.addEventListener('click', function() { if (mun2026Year !== '2026') doToggle(); });
+    toggleTrack.addEventListener('click', doToggle);
+    toggleSection.appendChild(label2020);
+    toggleSection.appendChild(toggleTrack);
+    toggleSection.appendChild(label2026);
+    container.appendChild(toggleSection);
+    updateToggleVisual();
+
+    // Bloc filter pills
+    var pillsSection = document.createElement('div');
+    pillsSection.style.cssText = 'padding:8px 10px;display:flex;flex-wrap:wrap;gap:4px;';
+    MUN_BLOCS.forEach(function(b) {
+      var pill = document.createElement('button');
+      pill.textContent = b.label;
+      pill.style.cssText = 'padding:3px 8px;border:1px solid #555;border-radius:12px;background:transparent;color:#aaa;font-size:11px;cursor:pointer;transition:all 0.15s;';
+      if (b.key === mun2026BlocFilter || (b.key === null && mun2026BlocFilter === null)) {
+        pill.style.background = b.color;
+        pill.style.color = (b.key === 'Centre' || b.key === 'Divers') ? '#222' : '#fff';
+        pill.style.borderColor = b.color;
+      }
+      pill.addEventListener('click', function() {
+        mun2026BlocFilter = b.key;
+        geoLayer.setStyle(getStyle);
+        applyBasculeGlow();
+        updateBottomBar();
+        renderCmdMunicipales2026();
+      });
+      pillsSection.appendChild(pill);
+    });
+    container.appendChild(pillsSection);
+
+    // Special filters
+    var filtersSection = document.createElement('div');
+    filtersSection.style.cssText = 'padding:6px 10px;border-top:1px solid #333;';
+    var SPECIAL_FILTERS = [
+      { key: 'bascules', label: 'Bascules uniquement' },
+      { key: 'nouveaux', label: 'Nouveaux maires' },
+      { key: 't2', label: 'Second tour' }
+    ];
+    SPECIAL_FILTERS.forEach(function(sf) {
+      var row = document.createElement('label');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer;color:#bbb;font-size:12px;';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = (mun2026Filter === sf.key);
+      cb.style.cssText = 'accent-color:#8E24AA;';
+      cb.addEventListener('change', function() {
+        mun2026Filter = cb.checked ? sf.key : null;
+        geoLayer.setStyle(getStyle);
+        applyBasculeGlow();
+        updateBottomBar();
+        renderCmdMunicipales2026();
+      });
+      row.appendChild(cb);
+      row.appendChild(document.createTextNode(sf.label));
+      filtersSection.appendChild(row);
+    });
+    container.appendChild(filtersSection);
+
+    // Legend
+    var legendDiv = document.createElement('div');
+    legendDiv.id = 'mun2026-legend';
+    legendDiv.style.cssText = 'padding:8px 10px;border-top:1px solid #333;';
+    container.appendChild(legendDiv);
+    renderMun2026Legend();
+
+    // Source note
+    var note = document.createElement('div');
+    note.style.cssText = 'padding:8px 10px;border-top:1px solid #333;color:#666;font-size:10px;line-height:1.4;';
+    note.textContent = 'Source : Ministère de l\'Intérieur — MAJ : 16/03/2026 (T1)';
+    container.appendChild(note);
+  }
+
   // --- updateBottomBar ---
   function updateBottomBar() {
     var el = document.getElementById('bottom-stats');
@@ -2691,6 +3074,21 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       var secAvg = secRatioCount > 0 ? (secTotalRatio / secRatioCount).toFixed(1) : '0';
       var secCatLabel = secuFilter ? (DELINQ_LABELS[secuFilter] || secuFilter) : 'Tous';
       el.textContent = secWithData.toLocaleString('fr') + ' communes avec donnees | Ratio moyen : ' + secAvg + ' /10k | ' + secCatLabel;
+    } else if (currentMode === 'municipales2026') {
+      var munBascules = 0, munNouveaux = 0, munT2 = 0, munPartSum = 0, munPartCount = 0;
+      for (var code in mun2026) {
+        var md = mun2026[code];
+        if (mun2026BlocFilter) {
+          var mBloc = mun2026Year === '2020' ? (md.b20 || 'Sans étiquette') : (md.b26 || 'Sans étiquette');
+          if (mBloc !== mun2026BlocFilter) continue;
+        }
+        if (md.cb === 1) munBascules++;
+        if (md.nm === 1) munNouveaux++;
+        if (md.st === 'T2') munT2++;
+        if (md.pa) { munPartSum += md.pa; munPartCount++; }
+      }
+      var munAvgPart = munPartCount > 0 ? (munPartSum / munPartCount).toFixed(1) : '0';
+      el.textContent = munBascules + ' bascules | ' + munNouveaux.toLocaleString('fr') + ' nouveaux maires | ' + munT2.toLocaleString('fr') + ' en attente T2 | Participation moy. : ' + munAvgPart + '%';
     } else {
       var withData = 0;
       var totalRatio = 0;
@@ -2897,6 +3295,14 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   if (urlState.filter) {
     activeFilter = urlState.filter;
     geoLayer.setStyle(getStyle);
+  }
+  if (urlState.mode === 'municipales2026') {
+    if (urlState.year === '2020') mun2026Year = '2020';
+    if (urlState.filter) mun2026Filter = urlState.filter;
+    if (urlState.bloc) mun2026BlocFilter = urlState.bloc;
+    renderCmdMunicipales2026();
+    geoLayer.setStyle(getStyle);
+    applyBasculeGlow();
   }
   if (urlState.commune) {
     var urlLayer = layerByCode[urlState.commune];
