@@ -265,6 +265,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     });
   }
   var results;
+  var mun2026 = null;
   try {
     var insightsP = fetchJSON('insights.json').catch(function(e) { console.warn('insights.json non disponible :', e.message); return {}; });
     var mun2026P = fetchJSON('municipales2026.json').catch(function(e) { console.warn('municipales2026.json non disponible :', e.message); return {}; });
@@ -344,7 +345,6 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   // --- State ---
   var activeFilter = null;
   var currentMode = 'prospection';
-  var mun2026 = null;
   var mun2026Year = '2026';
   var mun2026Filter = null;
   var mun2026BlocFilter = null;
@@ -713,7 +713,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   // Style dispatcher
   // Style function -- municipales 2026 mode
   function getStyleMunicipales2026(feature) {
-    var code = feature.properties.c;
+    var code = feature.properties.codgeo;
     var d = mun2026 ? mun2026[code] : null;
     if (!d) return STYLE_NO_DATA;
     var bloc = mun2026Year === '2020' ? (d.b20 || 'Sans étiquette') : (d.b26 || 'Sans étiquette');
