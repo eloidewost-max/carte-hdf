@@ -157,6 +157,11 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 .freshness-orange { color: #e8913a; }
 .freshness-red { color: #e74c3c; }
 
+/* --- Stats tables (surv/secu panels) --- */
+.stats-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.stats-table th { padding: 5px 6px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); color: #555; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stats-table td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+
 /* --- Coverage banner --- */
 .coverage-banner { padding: 8px 12px; background: rgba(74,144,217,0.06); border-radius: 4px; font-size: 12px; color: #8b8f98; margin-bottom: 8px; border-left: 3px solid #4a90d9; }
 
@@ -2325,23 +2330,13 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     statsSec.appendChild(statsTitle);
 
     var table = document.createElement('table');
-    table.style.width = '100%';
-    table.style.borderCollapse = 'collapse';
-    table.style.fontSize = '12px';
+    table.className = 'stats-table';
 
     var thead = document.createElement('thead');
     var headRow = document.createElement('tr');
     ['Famille', 'Communes', 'Moy. ratio'].forEach(function(h) {
       var th = document.createElement('th');
       th.textContent = h;
-      th.style.padding = '4px 6px';
-      th.style.textAlign = 'left';
-      th.style.borderBottom = '1px solid rgba(255,255,255,0.06)';
-      th.style.color = '#555';
-      th.style.fontWeight = '600';
-      th.style.fontSize = '10px';
-      th.style.textTransform = 'uppercase';
-      th.style.letterSpacing = '0.5px';
       headRow.appendChild(th);
     });
     thead.appendChild(headRow);
@@ -2622,23 +2617,13 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     statsSec.appendChild(statsTitle);
 
     var table = document.createElement('table');
-    table.style.width = '100%';
-    table.style.borderCollapse = 'collapse';
-    table.style.fontSize = '12px';
+    table.className = 'stats-table';
 
     var thead = document.createElement('thead');
     var headRow = document.createElement('tr');
     ['Famille', 'Communes', 'Moy. ratio'].forEach(function(h) {
       var th = document.createElement('th');
       th.textContent = h;
-      th.style.padding = '4px 6px';
-      th.style.textAlign = 'left';
-      th.style.borderBottom = '1px solid rgba(255,255,255,0.06)';
-      th.style.color = '#555';
-      th.style.fontWeight = '600';
-      th.style.fontSize = '10px';
-      th.style.textTransform = 'uppercase';
-      th.style.letterSpacing = '0.5px';
       headRow.appendChild(th);
     });
     thead.appendChild(headRow);
@@ -3298,8 +3283,11 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     openDetail(code);
   }
 
+  var searchTimer = null;
   searchInput.addEventListener('input', function() {
-    doSearch(this.value.trim());
+    var val = this.value.trim();
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() { doSearch(val); }, 80);
   });
 
   searchInput.addEventListener('keydown', function(e) {
@@ -3317,7 +3305,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     } else if (e.key === 'Enter' && searchActiveIdx >= 0) {
       e.preventDefault();
       var item = items[searchActiveIdx];
-      selectCommune(item.getAttribute('data-code'), item.querySelector('span').textContent);
+      selectCommune(item.getAttribute('data-code'), item.children[0].textContent.trim());
     } else if (e.key === 'Escape') {
       searchResults.style.display = 'none';
       searchInput.blur();

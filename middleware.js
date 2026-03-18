@@ -12,8 +12,9 @@ function getClerkDomain(publishableKey) {
 const clerkDomain = getClerkDomain(process.env.CLERK_PUBLISHABLE_KEY);
 const JWKS = createRemoteJWKSet(new URL('https://' + clerkDomain + '/.well-known/jwks.json'));
 
-// Email cache: avoids re-fetching from Clerk API on every request
+// Email cache: avoids re-fetching from Clerk API on every request (capped at 500 entries)
 const emailCache = new Map();
+const EMAIL_CACHE_MAX = 500;
 
 export const config = {
   matcher: ['/((?!sign-in|favicon\\.ico|_vercel).*)'],
@@ -71,6 +72,7 @@ export default async function middleware(request) {
     });
     const email = primaryEmail ? primaryEmail.email_address : '';
 
+    if (emailCache.size >= EMAIL_CACHE_MAX) emailCache.clear();
     emailCache.set(payload.sub, email);
 
     if (!email.endsWith('@' + ALLOWED_DOMAIN)) {
