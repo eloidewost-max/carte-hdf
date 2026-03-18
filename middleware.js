@@ -1,18 +1,23 @@
-import { verifyToken, createClerkClient } from '@clerk/backend';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 var ALLOWED_DOMAIN = 'vizzia.fr';
 
-var PUBLIC_PATHS = ['/sign-in', '/sign-in.html'];
+// Derive Clerk frontend API domain from the publishable key
+function getClerkDomain(publishableKey) {
+  var key = publishableKey.replace(/^pk_(test|live)_/, '');
+  var decoded = atob(key);
+  return decoded.replace(/\$$/, '');
+}
 
 export var config = {
-  matcher: ['/((?!_vercel|favicon\\.ico).*)'],
+  matcher: ['/((?!sign-in|favicon\\.ico|_vercel).*)'],
 };
 
 export default async function middleware(request) {
   var url = new URL(request.url);
 
-  // Allow sign-in page through
-  if (PUBLIC_PATHS.some(function(p) { return url.pathname === p; })) {
+  // Allow sign-in page through (with or without .html)
+  if (url.pathname === '/sign-in' || url.pathname === '/sign-in.html') {
     return;
   }
 
@@ -26,10 +31,11 @@ export default async function middleware(request) {
   }
 
   try {
-    // Verify JWT signature against Clerk's JWKS
-    var payload = await verifyToken(token, {
-      secretKey: process.env.CLERK_SECRET_KEY,
-    });
+    // Verify JWT against Clerk's JWKS (Edge-compatible via jose)
+    var clerkDomain = getClerkDomain(process.env.CLERK_PUBLISHABLE_KEY);
+    var JWKS = createRemoteJWKSet(new URL('https://' + clerkDomain + '/.well-known/jwks.json'));
+    var result = await jwtVerify(token, JWKS);
+    var payload = result.payload;
 
     // Check email from custom session claims (fast path, no API call)
     if (payload.email) {
@@ -39,13 +45,20 @@ export default async function middleware(request) {
       return; // authorized
     }
 
-    // Fallback: fetch user from Clerk API to get email
-    var clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
-    var user = await clerk.users.getUser(payload.sub);
-    var primaryEmail = user.emailAddresses.find(function(e) {
-      return e.id === user.primaryEmailAddressId;
+    // Fallback: fetch user from Clerk REST API to get email
+    var userRes = await fetch('https://api.clerk.com/v1/users/' + payload.sub, {
+      headers: { 'Authorization': 'Bearer ' + process.env.CLERK_SECRET_KEY }
     });
-    var email = primaryEmail ? primaryEmail.emailAddress : '';
+
+    if (!userRes.ok) {
+      return Response.redirect(new URL('/sign-in', request.url));
+    }
+
+    var user = await userRes.json();
+    var primaryEmail = (user.email_addresses || []).find(function(e) {
+      return e.id === user.primary_email_address_id;
+    });
+    var email = primaryEmail ? primaryEmail.email_address : '';
 
     if (!email.endsWith('@' + ALLOWED_DOMAIN)) {
       return accessDenied();
