@@ -258,10 +258,14 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         var btnSignout = document.getElementById('btn-signout');
         btnSignout.style.display = '';
         btnSignout.addEventListener('click', function() {
-          document.cookie = '__session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-          document.cookie = '__client_uat=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-          try { window.Clerk.signOut(); } catch(e) {}
-          setTimeout(function() { window.location.href = '/sign-in'; }, 300);
+          function forceSignOut() {
+            document.cookie = '__session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            document.cookie = '__client_uat=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            window.location.href = '/sign-in';
+          }
+          try {
+            window.Clerk.signOut({ redirectUrl: '/sign-in' }).then(forceSignOut).catch(forceSignOut);
+          } catch(e) { forceSignOut(); }
         });
       }
     } catch(e) { /* Clerk init failed, continue anyway — middleware handles auth */ }

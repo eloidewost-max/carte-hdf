@@ -1,52 +1,63 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
-var ALLOWED_DOMAIN = 'vizzia.fr';
+const ALLOWED_DOMAIN = 'vizzia.fr';
 
-// Derive Clerk frontend API domain from the publishable key
+// Derive Clerk frontend API domain from the publishable key (runs once at cold start)
 function getClerkDomain(publishableKey) {
-  var key = publishableKey.replace(/^pk_(test|live)_/, '');
-  var decoded = atob(key);
-  return decoded.replace(/\$$/, '');
+  const key = publishableKey.replace(/^pk_(test|live)_/, '');
+  return atob(key).replace(/\$$/, '');
 }
 
-export var config = {
+// Hoisted to module scope so JWKS cache persists across requests
+const clerkDomain = getClerkDomain(process.env.CLERK_PUBLISHABLE_KEY);
+const JWKS = createRemoteJWKSet(new URL('https://' + clerkDomain + '/.well-known/jwks.json'));
+
+// Email cache: avoids re-fetching from Clerk API on every request
+const emailCache = new Map();
+
+export const config = {
   matcher: ['/((?!sign-in|favicon\\.ico|_vercel).*)'],
 };
 
 export default async function middleware(request) {
-  var url = new URL(request.url);
+  const url = new URL(request.url);
 
-  // Allow sign-in page through (with or without .html)
-  if (url.pathname === '/sign-in' || url.pathname === '/sign-in.html') {
+  if (url.pathname === '/sign-in.html') {
     return;
   }
 
   // Extract session token from Clerk cookie
-  var cookieHeader = request.headers.get('cookie') || '';
-  var match = cookieHeader.match(/__session=([^;]+)/);
-  var token = match ? match[1] : null;
+  const cookieHeader = request.headers.get('cookie') || '';
+  const sessionCookie = cookieHeader.split('; ').find(function(c) { return c.startsWith('__session='); });
+  const token = sessionCookie ? sessionCookie.slice('__session='.length) : null;
 
   if (!token) {
     return Response.redirect(new URL('/sign-in', request.url));
   }
 
   try {
-    // Verify JWT against Clerk's JWKS (Edge-compatible via jose)
-    var clerkDomain = getClerkDomain(process.env.CLERK_PUBLISHABLE_KEY);
-    var JWKS = createRemoteJWKSet(new URL('https://' + clerkDomain + '/.well-known/jwks.json'));
-    var result = await jwtVerify(token, JWKS);
-    var payload = result.payload;
+    const result = await jwtVerify(token, JWKS);
+    const payload = result.payload;
 
-    // Check email from custom session claims (fast path, no API call)
+    // Fast path: email in custom session claims (no API call)
     if (payload.email) {
       if (!payload.email.endsWith('@' + ALLOWED_DOMAIN)) {
         return accessDenied();
       }
-      return; // authorized
+      return;
     }
 
-    // Fallback: fetch user from Clerk REST API to get email
-    var userRes = await fetch('https://api.clerk.com/v1/users/' + payload.sub, {
+    // Check cache before calling Clerk API
+    if (emailCache.has(payload.sub)) {
+      const cached = emailCache.get(payload.sub);
+      if (!cached.endsWith('@' + ALLOWED_DOMAIN)) {
+        return accessDenied();
+      }
+      return;
+    }
+
+    // Fallback: fetch user from Clerk REST API
+    const userRes = await fetch('https://api.clerk.com/v1/users/' + payload.sub, {
       headers: { 'Authorization': 'Bearer ' + process.env.CLERK_SECRET_KEY }
     });
 
@@ -54,19 +65,20 @@ export default async function middleware(request) {
       return Response.redirect(new URL('/sign-in', request.url));
     }
 
-    var user = await userRes.json();
-    var primaryEmail = (user.email_addresses || []).find(function(e) {
+    const user = await userRes.json();
+    const primaryEmail = (user.email_addresses || []).find(function(e) {
       return e.id === user.primary_email_address_id;
     });
-    var email = primaryEmail ? primaryEmail.email_address : '';
+    const email = primaryEmail ? primaryEmail.email_address : '';
+
+    emailCache.set(payload.sub, email);
 
     if (!email.endsWith('@' + ALLOWED_DOMAIN)) {
       return accessDenied();
     }
 
-    return; // authorized
+    return;
   } catch (err) {
-    // Invalid or expired token
     return Response.redirect(new URL('/sign-in', request.url));
   }
 }

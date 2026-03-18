@@ -37,38 +37,32 @@ body {
   <script>
     window.addEventListener('load', function() {
       var Clerk = window.Clerk;
+      var CLERK_APPEARANCE = {
+        appearance: { variables: { colorPrimary: '#4ecdc4', colorBackground: '#111318', colorText: '#e2e4e9', colorTextSecondary: '#8b8f98', colorInputBackground: 'rgba(255,255,255,0.06)', colorInputText: '#e2e4e9' } }
+      };
+
+      function showSignIn(errorMsg) {
+        if (errorMsg) {
+          document.getElementById('sign-in-container').insertAdjacentHTML('beforebegin',
+            '<p style="color:#e8913a;margin-bottom:16px;text-align:center">' + errorMsg + '</p>'
+          );
+        }
+        Clerk.mountSignIn(document.getElementById('sign-in-container'), CLERK_APPEARANCE);
+      }
+
       Clerk.load().then(function() {
         document.getElementById('loading').style.display = 'none';
         if (Clerk.user) {
-          // Check email domain before redirecting
           var email = Clerk.user.primaryEmailAddress ? Clerk.user.primaryEmailAddress.emailAddress : '';
           if (email.endsWith('@vizzia.fr')) {
             window.location.href = '/';
             return;
           }
-          // Wrong domain — sign out and show login again
           Clerk.signOut({ redirectUrl: '/sign-in' }).then(function() {
-            document.getElementById('sign-in-container').insertAdjacentHTML('beforebegin',
-              '<p style="color:#e8913a;margin-bottom:16px;text-align:center">Seules les adresses <strong>@vizzia.fr</strong> sont autorisées.</p>'
-            );
-            Clerk.mountSignIn(document.getElementById('sign-in-container'), {
-              appearance: { variables: { colorPrimary: '#4ecdc4', colorBackground: '#111318', colorText: '#e2e4e9', colorTextSecondary: '#8b8f98', colorInputBackground: 'rgba(255,255,255,0.06)', colorInputText: '#e2e4e9' } }
-            });
+            showSignIn('Seules les adresses <strong>@vizzia.fr</strong> sont autorisées.');
           });
-          return;
         } else {
-          Clerk.mountSignIn(document.getElementById('sign-in-container'), {
-            appearance: {
-              variables: {
-                colorPrimary: '#4ecdc4',
-                colorBackground: '#111318',
-                colorText: '#e2e4e9',
-                colorTextSecondary: '#8b8f98',
-                colorInputBackground: 'rgba(255,255,255,0.06)',
-                colorInputText: '#e2e4e9',
-              }
-            }
-          });
+          showSignIn();
         }
       });
     });
