@@ -40,8 +40,22 @@ body {
       Clerk.load().then(function() {
         document.getElementById('loading').style.display = 'none';
         if (Clerk.user) {
-          // Already signed in, go to the map
-          window.location.href = '/';
+          // Check email domain before redirecting
+          var email = Clerk.user.primaryEmailAddress ? Clerk.user.primaryEmailAddress.emailAddress : '';
+          if (email.endsWith('@vizzia.fr')) {
+            window.location.href = '/';
+            return;
+          }
+          // Wrong domain — sign out and show login again
+          Clerk.signOut().then(function() {
+            document.getElementById('sign-in-container').insertAdjacentHTML('beforebegin',
+              '<p style="color:#e8913a;margin-bottom:16px;text-align:center">Seules les adresses <strong>@vizzia.fr</strong> sont autorisées.</p>'
+            );
+            Clerk.mountSignIn(document.getElementById('sign-in-container'), {
+              appearance: { variables: { colorPrimary: '#4ecdc4', colorBackground: '#111318', colorText: '#e2e4e9', colorTextSecondary: '#8b8f98', colorInputBackground: 'rgba(255,255,255,0.06)', colorInputText: '#e2e4e9' } }
+            });
+          });
+          return;
         } else {
           Clerk.mountSignIn(document.getElementById('sign-in-container'), {
             appearance: {
