@@ -1,0 +1,6 @@
+{
+  "framework": null,
+  "rewrites": [
+    { "source": "/sign-in", "destination": "/sign-in.html" }
+  ]
+}

@@ -4,17 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Interactive map visualizing French municipal mayors' political affiliations, local surveillance data, crime statistics, and socio-economic indicators across ~35,000 communes. Four modes: **prospection** (composite score for video-enforcement potential, default), **politique** (political family colors), **surveillance** (heatmap of police agents per capita), and **securite** (crime rate heatmap by category).
+Interactive map visualizing French municipal mayors' political affiliations, local surveillance data, crime statistics, and socio-economic indicators across ~35,000 communes. Five modes: **prospection** (composite score for video-enforcement potential, default), **politique** (political family colors), **surveillance** (heatmap of police agents per capita), **securite** (crime rate heatmap by category), and **municipales2026** (upcoming municipal election data with party glow effects).
 
 ## Architecture
 
-**Single-file frontend** — all HTML, CSS, and JavaScript live in `index.html` (~2700 lines). No build system, no package manager, no framework beyond Leaflet.
+**Single-file frontend** — all HTML, CSS, and JavaScript live in `index.html` (~3400 lines). No build system, no framework beyond Leaflet. Deployed on **Vercel** with **Clerk** authentication (Edge Middleware + jose JWT verification). Only `@vizzia.fr` email addresses can access the app.
 
 ### Frontend Stack
 - **Leaflet.js** (v1.9.4) for map rendering, loaded from CDN with SRI hash
 - **topojson-client** (v3.1.0) for converting TopoJSON → GeoJSON, loaded from CDN with SRI hash
+- **Clerk JS** for client-side session management (sign-in/sign-out), loaded from Clerk's CDN
 - **CartoDB Dark No Labels** basemap
 - Vanilla JavaScript (ES5-compatible), inline CSS
+
+### Authentication & Hosting
+- **Vercel** — static site hosting with Edge Middleware
+- **Clerk** — authentication provider, restricts access to `@vizzia.fr` emails
+- **`middleware.js`** — Vercel Edge Middleware using `jose` for JWT verification against Clerk's JWKS; checks email domain via Clerk REST API (cached per user)
+- **`sign-in.html`** — login page with Clerk's `mountSignIn` component (dark theme matching the app)
+- **`vercel.json`** — framework: null, rewrite `/sign-in` → `/sign-in.html`
+- **Environment variables** (set in Vercel dashboard): `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
 
 ### Data Pipeline
 Python scripts generate JSON data files from external sources (data.gouv.fr, INSEE, ONISR, DGFiP):
@@ -28,7 +37,13 @@ process_enrichment.py   → enrichment.json    (QPV, DGFiP finances, revenus, ~3
 process_insights.py     → insights.json      (peer groups, benchmarks, narrative flags, ~5 MB)
 ```
 
+```
+process_municipales2026.py  → municipales2026.json (municipal election data, ~8.5 MB)
+```
+
 Python dependencies: `pandas`, `openpyxl`, `odf`, `pyarrow` (for parquet)
+
+Node dependencies (for Vercel middleware): `jose` (JWT verification, Edge-compatible)
 
 ### Key Data Files
 - `communes-topo.json` — TopoJSON commune boundaries (13 MB, object key: `a_com2022`)
@@ -56,17 +71,18 @@ Composite score from 6 weighted signals (no_videoverb moved to filter-only):
 - **`dashArray: null`** on all non-dashed styles — prevents Leaflet `setStyle` merge leak when switching from dashed modes (surveillance/securite) to non-dashed (politique/prospection)
 - **Score caching** — `prospScoreCache` avoids recomputing 35k scores; invalidated on weight/filter change
 - **Debounced sliders** — all range inputs use 50ms `setTimeout` to avoid 60Hz restyles during drag
+- **Debounced search** — 80ms debounce on search input to avoid 35k linear scans at keystroke rate
 - **Search normalization** — `nameNorm` pre-computed at index build time (NFD + diacritics strip + lowercase) instead of per keystroke
 - **Memory management** — `topoData = null` after TopoJSON→GeoJSON conversion, `communesGeo = null` after layer creation
 
 ### State Management
-Global JS variables: `currentMode` ('prospection'|'politique'|'surveillance'|'securite', default: `'prospection'`), `activeFilter` (selected political family), `survFilters` (ratio slider + checkbox), `prospWeights` (signal weights for scoring), `prospFilters` (prospection mode filters including `qpvOnly`), `secuFilter` (selected crime category or null), `secuFilters` (ratioMin slider + dataOnly checkbox), `delinq` (delinquance data object), `enrich` (enrichment data object), `insights` (peer groups + benchmarks + narrative flags).
+Global JS variables: `currentMode` ('prospection'|'politique'|'surveillance'|'securite'|'municipales2026', default: `'prospection'`), `activeFilter` (selected political family), `survFilters` (ratio slider + checkbox), `prospWeights` (signal weights for scoring), `prospFilters` (prospection mode filters including `qpvOnly`), `secuFilter` (selected crime category or null), `secuFilters` (ratioMin slider + dataOnly checkbox), `delinq` (delinquance data object), `enrich` (enrichment data object), `insights` (peer groups + benchmarks + narrative flags), `mun2026` (municipales 2026 data object).
 
 ### Deep Linking
 URL parameters: `?mode=X&commune=XXXXX&filter=Y`. State encoded via `history.pushState` (commune changes) and `history.replaceState` (mode/filter changes). Restored on page load after data and layers are initialized. Default mode (prospection) omitted from URL for clean links.
 
 ### Core Flow
-1. Fetch 7 JSON data files on load (maires, surveillance, prospection, delinquance, enrichment, insights)
+1. Fetch 8 JSON data files on load (maires, surveillance, prospection, delinquance, enrichment, insights, municipales2026)
 2. Convert TopoJSON → GeoJSON via `topojson.feature()`, then free source objects
 3. Style communes via `getStylePolitique()`, `getStyleSurveillance()`, `getStyleSecurite()`, or `getStyleProspection()` based on mode; all return `dashArray: null` (or `'2 4'` for dashed) to prevent style leaks
 4. Hover shows info panel (`#info`), click zooms + opens detail panel (`#detail-panel.open`)
@@ -83,10 +99,11 @@ URL parameters: `?mode=X&commune=XXXXX&filter=Y`. State encoded via `history.pus
 | Politique | `#4a90d9` | Political family colors |
 | Surveillance | `#e8913a` | Yellow → red (6 levels) |
 | Securite | `#c0392b` | Violet → magenta (6 levels, `SECU_COLORS`) |
+| Municipales 2026 | `#f1c40f` | Party-specific colors with CSS glow effects |
 
 ### UI Layout
-- **`#top-bar`** — search box, mode tab buttons (`.mode-btn[data-mode]`), methodology button
-- **`#cmd-panel > #cmd-content`** — left sidebar, dynamically rebuilt on mode switch (`renderCmdPolitique`, `renderCmdSurveillance`, `renderCmdSecurite`, `renderCmdProspection`)
+- **`#top-bar`** — search box, mode tab buttons (`.mode-btn[data-mode]`), methodology button, user email + sign-out button
+- **`#cmd-panel > #cmd-content`** — left sidebar, dynamically rebuilt on mode switch (`renderCmdPolitique`, `renderCmdSurveillance`, `renderCmdSecurite`, `renderCmdProspection`, `renderCmdMunicipales2026`)
 - **`#map`** — Leaflet container
 - **`#bottom-bar > #bottom-stats`** — contextual stats per mode
 - **`#detail-panel`** — slide-in right panel (`.open` class), commune-level deep dive
@@ -106,7 +123,13 @@ python3 process_insights.py        # computes peer groups + benchmarks from othe
 ```
 
 ### Development
-Open `index.html` directly in a browser — no dev server needed.
+Open `index.html` directly in a browser — no dev server needed. Auth is bypassed locally (Clerk JS fails gracefully, middleware only runs on Vercel).
+
+### Deployment
+Deployed on **Vercel** with automatic deploys from `main` branch on GitHub (`memfice/carte-politique`).
+1. Push to `main` → Vercel auto-deploys
+2. Environment variables (`CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`) are set in Vercel dashboard
+3. Clerk publishable key is also embedded in `sign-in.html` and `index.html` (publishable keys are public by design)
 
 ## Conventions
 
@@ -115,6 +138,8 @@ Open `index.html` directly in a browser — no dev server needed.
 - **Data keys:** short abbreviations to minimize JSON size (see data files section above)
 - **Language:** UI text is in French
 - **Style returns:** every `getStyle*()` function and `STYLE_*` constant must include `dashArray` (either `null` or a dash pattern) to prevent Leaflet merge leaks
-- **CDN scripts:** must have `integrity` (SRI) and `crossorigin="anonymous"` attributes
+- **CDN scripts:** must have `integrity` (SRI) and `crossorigin="anonymous"` attributes (except Clerk JS which is loaded from Clerk's own domain)
 - **Slider handlers:** must debounce expensive operations (restyle, list rebuild) at 50ms minimum
 - **Leaflet gotcha:** `setStyle()` merges properties (doesn't replace); use `resetStyle()` or explicit nulls to clear stale properties
+- **Clerk JS CDN:** must load from `improved-stag-29.clerk.accounts.dev/npm/@clerk/clerk-js@latest/...` (not jsdelivr) — the Clerk-hosted bundle includes UI components (SignIn, UserButton), the npm bundle is headless-only
+- **Middleware:** uses `jose` (not `@clerk/backend`) for JWT verification — `@clerk/backend` imports Node.js `crypto` which is incompatible with Vercel Edge Runtime

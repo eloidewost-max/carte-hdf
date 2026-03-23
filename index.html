@@ -157,6 +157,11 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 .freshness-orange { color: #e8913a; }
 .freshness-red { color: #e74c3c; }
 
+/* --- Stats tables (surv/secu panels) --- */
+.stats-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.stats-table th { padding: 5px 6px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); color: #555; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stats-table td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+
 /* --- Coverage banner --- */
 .coverage-banner { padding: 8px 12px; background: rgba(74,144,217,0.06); border-radius: 4px; font-size: 12px; color: #8b8f98; margin-bottom: 8px; border-left: 3px solid #4a90d9; }
 
@@ -229,6 +234,10 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     </div>
     <button id="btn-clients" title="Afficher les clients" style="background:none;border:1px solid rgba(255,255,255,0.08);color:#8b8f98;padding:0 12px;height:30px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.15s;flex-shrink:0;">Clients</button>
     <button id="btn-methodo" title="Methodologie et sources">?</button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+      <span id="user-email" style="color:#8b8f98;font-size:12px"></span>
+      <button id="btn-signout" style="display:none;background:none;border:1px solid rgba(255,255,255,0.08);color:#8b8f98;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px" title="Se déconnecter">Déconnexion</button>
+    </div>
   </div>
 
   <div id="cmd-panel">
@@ -264,8 +273,33 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/topojson-client@3.1.0/dist/topojson-client.min.js" integrity="sha256-Jc0CrkhsxQY+AhWk5M+xXeg3AMh6xIusTVfcaq8+u4k=" crossorigin="anonymous"></script>
+<!-- IMPORTANT: Replace pk_YOUR_PUBLISHABLE_KEY with your Clerk publishable key -->
+<script data-clerk-publishable-key="pk_test_aW1wcm92ZWQtc3RhZy0yOS5jbGVyay5hY2NvdW50cy5kZXYk" src="https://improved-stag-29.clerk.accounts.dev/npm/@clerk/clerk-js@latest/dist/clerk.browser.js" type="text/javascript"></script>
 <script>
 (async function() {
+  // Initialize Clerk (sign-out button + user display)
+  if (window.Clerk) {
+    try {
+      await window.Clerk.load();
+      if (window.Clerk.user) {
+        var email = window.Clerk.user.primaryEmailAddress ? window.Clerk.user.primaryEmailAddress.emailAddress : '';
+        document.getElementById('user-email').textContent = email;
+        var btnSignout = document.getElementById('btn-signout');
+        btnSignout.style.display = '';
+        btnSignout.addEventListener('click', function() {
+          function forceSignOut() {
+            document.cookie = '__session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            document.cookie = '__client_uat=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            window.location.href = '/sign-in';
+          }
+          try {
+            window.Clerk.signOut({ redirectUrl: '/sign-in' }).then(forceSignOut).catch(forceSignOut);
+          } catch(e) { forceSignOut(); }
+        });
+      }
+    } catch(e) { /* Clerk init failed, continue anyway — middleware handles auth */ }
+  }
+
   var map = L.map('map', {
     center: [46.5, 2.5],
     zoom: 6,
@@ -790,17 +824,17 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var code = feature.properties.codgeo;
     var d = mun2026 ? mun2026[code] : null;
     if (!d) return STYLE_NO_DATA;
-    var bloc = mun2026Year === '2020' ? (d.b20 || 'Sans étiquette') : (d.b26 || 'Sans étiquette');
+    var bloc = mun2026Year === '2020' ? (d.b20 || 'Sans étiquette') : (d.bf || d.b26 || 'Sans étiquette');
     if (mun2026BlocFilter && bloc !== mun2026BlocFilter) return STYLE_FILTERED;
     if (mun2026Filter === 'bascules' && d.cb !== 1) return STYLE_FILTERED;
     if (mun2026Filter === 'nouveaux' && d.nm !== 1) return STYLE_FILTERED;
-    if (mun2026Filter === 't2' && d.st !== 'T2') return STYLE_FILTERED;
-    var fillColor = mun2026Year === '2020' ? (d.cl20 || '#666') : (d.cl26 || '#666');
-    if (d.st === 'T2' && mun2026Year === '2026') {
-      return { fillColor: fillColor, fillOpacity: 0.6, weight: 0.5, color: '#888', opacity: 0.6, dashArray: '4 4' };
-    }
+    if (mun2026Filter === 't2' && d.td !== 'T2') return STYLE_FILTERED;
+    var fillColor = mun2026Year === '2020' ? (d.cl20 || '#666') : (d.clf || d.cl26 || '#666');
     if (d.cb === 1 && mun2026Year === '2026') {
       return { fillColor: fillColor, fillOpacity: 0.85, weight: 2.5, color: '#FFFFFF', opacity: 0.9, dashArray: null };
+    }
+    if (d.td === 'T2' && mun2026Year === '2026') {
+      return { fillColor: fillColor, fillOpacity: 0.75, weight: 0.8, color: '#aaa', opacity: 0.7, dashArray: null };
     }
     return { fillColor: fillColor, fillOpacity: 0.75, weight: 0.3, color: '#555', opacity: 0.5, dashArray: null };
   }
@@ -843,12 +877,12 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       if (!layer || !layer.getElement()) continue;
       var d = mun2026[code];
       if (mun2026BlocFilter) {
-        var bloc = d.b26 || 'Sans étiquette';
+        var bloc = d.bf || d.b26 || 'Sans étiquette';
         if (bloc !== mun2026BlocFilter) continue;
       }
       if (mun2026Filter && mun2026Filter !== 'bascules') {
         if (mun2026Filter === 'nouveaux' && d.nm !== 1) continue;
-        if (mun2026Filter === 't2' && d.st !== 'T2') continue;
+        if (mun2026Filter === 't2' && d.td !== 'T2') continue;
       }
       layer.getElement().classList.add('bascule-glow');
     }
@@ -931,11 +965,13 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       }
     } else if (currentMode === 'municipales2026') {
       var md = mun2026 ? mun2026[code] : null;
-      if (md && md.vt1) {
-        var blocLabel = mun2026Year === '2020' ? (md.b20 || '') : (md.b26 || '');
-        infoMetric.textContent = md.vt1 + (blocLabel ? ' \u2014 ' + blocLabel : '');
+      if (md && (md.vf || md.vt1)) {
+        var vainqueur = md.vf || md.vt1;
+        var blocLabel = mun2026Year === '2020' ? (md.b20 || '') : (md.bf || md.b26 || '');
+        var tourTag = md.td === 'T2' ? ' (T2)' : '';
+        infoMetric.textContent = vainqueur + tourTag + (blocLabel ? ' \u2014 ' + blocLabel : '');
       } else if (md) {
-        infoMetric.textContent = 'Pas de resultat T1';
+        infoMetric.textContent = 'Pas de resultat';
       } else {
         infoMetric.textContent = 'Pas de donnees';
       }
@@ -1623,17 +1659,18 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         munSec.appendChild(sortantDiv);
       }
 
+      // --- T1 result block ---
       var resDiv = document.createElement('div');
       resDiv.style.cssText = 'margin-bottom:8px;padding:8px;background:rgba(255,255,255,0.03);border-radius:4px;';
       var resLabel = document.createElement('div');
       resLabel.style.cssText = 'font-size:10px;color:#888;margin-bottom:4px;';
-      resLabel.textContent = 'R\u00e9sultat T1 2026';
+      resLabel.textContent = 'R\u00e9sultat T1';
       resDiv.appendChild(resLabel);
 
       if (md.vt1) {
         var winDiv = document.createElement('div');
         winDiv.style.cssText = 'font-size:13px;color:#eee;font-weight:600;';
-        winDiv.textContent = '\u25B6 ' + md.vt1 + (md.sc ? ' \u2014 ' + md.sc + '%' : '');
+        winDiv.textContent = '\u25B6 ' + md.vt1 + (md.sc1 ? ' \u2014 ' + md.sc1 + '%' : '');
         resDiv.appendChild(winDiv);
         if (md.lt1) {
           var listeDiv = document.createElement('div');
@@ -1644,38 +1681,74 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
         if (md.b26) {
           var winBloc = document.createElement('span');
           winBloc.className = 'detail-badge';
-          winBloc.style.cssText = 'margin:2px 0 2px 14px;color:#fff;background:' + (md.cl26 || '#666') + ';';
+          winBloc.style.cssText = 'margin:2px 0 2px 14px;color:#fff;background:' + (md.cl20 ? md.cl20 : '#666') + ';';
+          // Use b26 (T1 bloc) for the T1 badge color
+          winBloc.style.background = md.b26 ? (({'Extr\u00eame gauche':'#B71C1C','Gauche':'#E2001A','Centre':'#FFB300','Droite':'#0056A6','Extr\u00eame droite':'#0D1B4A','Divers':'#9E9E9E'})[md.b26] || '#666') : '#666';
           winBloc.textContent = md.b26 + (md.n26 ? ' (' + md.n26 + ')' : '');
           resDiv.appendChild(winBloc);
         }
-        if (md.st === 'T2') {
-          var t2Badge = document.createElement('span');
-          t2Badge.className = 'detail-badge';
-          t2Badge.style.cssText = 'margin-left:6px;background:#555;color:#ddd;border:1px dashed #888;';
-          t2Badge.textContent = 'Second tour';
-          resDiv.appendChild(t2Badge);
-        }
       }
 
-      if (md.s2) {
+      if (md.s2t1) {
         var secDiv = document.createElement('div');
         secDiv.style.cssText = 'font-size:12px;color:#999;margin-top:6px;';
-        secDiv.textContent = '\u25B7 ' + md.s2 + (md.sc2 ? ' \u2014 ' + md.sc2 + '%' : '');
+        secDiv.textContent = '\u25B7 ' + md.s2t1 + (md.sc2t1 ? ' \u2014 ' + md.sc2t1 + '%' : '');
         resDiv.appendChild(secDiv);
-        if (md.sc && md.sc2) {
-          var margeDiv = document.createElement('div');
-          margeDiv.style.cssText = 'font-size:11px;color:#777;padding-left:14px;';
-          margeDiv.textContent = 'Marge : +' + (md.sc - md.sc2).toFixed(1) + ' pts';
-          resDiv.appendChild(margeDiv);
-        }
+      }
+      if (md.pa1) {
+        var partDiv = document.createElement('div');
+        partDiv.style.cssText = 'font-size:11px;color:#777;margin-top:4px;';
+        partDiv.textContent = 'Participation : ' + md.pa1 + '%';
+        resDiv.appendChild(partDiv);
       }
       munSec.appendChild(resDiv);
 
-      if (md.pa) {
-        var partDiv = document.createElement('div');
-        partDiv.style.cssText = 'font-size:12px;color:#aaa;margin-bottom:8px;';
-        partDiv.textContent = 'Participation : ' + md.pa + '%';
-        munSec.appendChild(partDiv);
+      // --- T2 result block (only if commune went to T2) ---
+      if (md.td === 'T2' && md.vt2) {
+        var res2Div = document.createElement('div');
+        res2Div.style.cssText = 'margin-bottom:8px;padding:8px;background:rgba(142,36,170,0.06);border-radius:4px;border-left:3px solid #8E24AA;';
+        var res2Label = document.createElement('div');
+        res2Label.style.cssText = 'font-size:10px;color:#8E24AA;margin-bottom:4px;font-weight:600;';
+        res2Label.textContent = 'R\u00e9sultat T2 \u2014 \u00c9lu';
+        res2Div.appendChild(res2Label);
+
+        var win2Div = document.createElement('div');
+        win2Div.style.cssText = 'font-size:13px;color:#eee;font-weight:600;';
+        win2Div.textContent = '\u25B6 ' + md.vt2 + (md.sc2 ? ' \u2014 ' + md.sc2 + '%' : '');
+        res2Div.appendChild(win2Div);
+        if (md.lt2) {
+          var liste2Div = document.createElement('div');
+          liste2Div.style.cssText = 'font-size:11px;color:#999;margin:2px 0;padding-left:14px;';
+          liste2Div.textContent = md.lt2;
+          res2Div.appendChild(liste2Div);
+        }
+        if (md.bf) {
+          var win2Bloc = document.createElement('span');
+          win2Bloc.className = 'detail-badge';
+          win2Bloc.style.cssText = 'margin:2px 0 2px 14px;color:#fff;background:' + (md.clf || '#666') + ';';
+          win2Bloc.textContent = md.bf + (md.nf ? ' (' + md.nf + ')' : '');
+          res2Div.appendChild(win2Bloc);
+        }
+
+        if (md.s2t2) {
+          var sec2Div = document.createElement('div');
+          sec2Div.style.cssText = 'font-size:12px;color:#999;margin-top:6px;';
+          sec2Div.textContent = '\u25B7 ' + md.s2t2 + (md.sc2t2 ? ' \u2014 ' + md.sc2t2 + '%' : '');
+          res2Div.appendChild(sec2Div);
+        }
+        if (md.sc2 && md.sc2t2) {
+          var marge2Div = document.createElement('div');
+          marge2Div.style.cssText = 'font-size:11px;color:#777;padding-left:14px;';
+          marge2Div.textContent = 'Marge : +' + (md.sc2 - md.sc2t2).toFixed(1) + ' pts';
+          res2Div.appendChild(marge2Div);
+        }
+        if (md.pa2) {
+          var part2Div = document.createElement('div');
+          part2Div.style.cssText = 'font-size:11px;color:#777;margin-top:4px;';
+          part2Div.textContent = 'Participation T2 : ' + md.pa2 + '%';
+          res2Div.appendChild(part2Div);
+        }
+        munSec.appendChild(res2Div);
       }
 
       var statusDiv = document.createElement('div');
@@ -2482,23 +2555,13 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     statsSec.appendChild(statsTitle);
 
     var table = document.createElement('table');
-    table.style.width = '100%';
-    table.style.borderCollapse = 'collapse';
-    table.style.fontSize = '12px';
+    table.className = 'stats-table';
 
     var thead = document.createElement('thead');
     var headRow = document.createElement('tr');
     ['Famille', 'Communes', 'Moy. ratio'].forEach(function(h) {
       var th = document.createElement('th');
       th.textContent = h;
-      th.style.padding = '4px 6px';
-      th.style.textAlign = 'left';
-      th.style.borderBottom = '1px solid rgba(255,255,255,0.06)';
-      th.style.color = '#555';
-      th.style.fontWeight = '600';
-      th.style.fontSize = '10px';
-      th.style.textTransform = 'uppercase';
-      th.style.letterSpacing = '0.5px';
       headRow.appendChild(th);
     });
     thead.appendChild(headRow);
@@ -2779,23 +2842,13 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     statsSec.appendChild(statsTitle);
 
     var table = document.createElement('table');
-    table.style.width = '100%';
-    table.style.borderCollapse = 'collapse';
-    table.style.fontSize = '12px';
+    table.className = 'stats-table';
 
     var thead = document.createElement('thead');
     var headRow = document.createElement('tr');
     ['Famille', 'Communes', 'Moy. ratio'].forEach(function(h) {
       var th = document.createElement('th');
       th.textContent = h;
-      th.style.padding = '4px 6px';
-      th.style.textAlign = 'left';
-      th.style.borderBottom = '1px solid rgba(255,255,255,0.06)';
-      th.style.color = '#555';
-      th.style.fontWeight = '600';
-      th.style.fontSize = '10px';
-      th.style.textTransform = 'uppercase';
-      th.style.letterSpacing = '0.5px';
       headRow.appendChild(th);
     });
     thead.appendChild(headRow);
@@ -3062,13 +3115,13 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     title.textContent = 'Légende';
     legendDiv.appendChild(title);
     var counts = {};
-    var yearKey = mun2026Year === '2020' ? 'b20' : 'b26';
+    var yearKey = mun2026Year === '2020' ? 'b20' : 'bf';
     for (var code in mun2026) {
       var d = mun2026[code];
       if (mun2026Filter === 'bascules' && d.cb !== 1) continue;
       if (mun2026Filter === 'nouveaux' && d.nm !== 1) continue;
-      if (mun2026Filter === 't2' && d.st !== 'T2') continue;
-      var bloc = d[yearKey] || 'Sans étiquette';
+      if (mun2026Filter === 't2' && d.td !== 'T2') continue;
+      var bloc = d[yearKey] || d['b26'] || 'Sans étiquette';
       if (mun2026BlocFilter && bloc !== mun2026BlocFilter) continue;
       counts[bloc] = (counts[bloc] || 0) + 1;
     }
@@ -3194,7 +3247,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var SPECIAL_FILTERS = [
       { key: 'bascules', label: 'Bascules uniquement' },
       { key: 'nouveaux', label: 'Nouveaux maires' },
-      { key: 't2', label: 'Second tour' }
+      { key: 't2', label: '\u00c9lus au second tour' }
     ];
     SPECIAL_FILTERS.forEach(function(sf) {
       var row = document.createElement('label');
@@ -3227,7 +3280,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     var note = document.createElement('div');
     note.className = 'cmd-section';
     note.style.cssText = 'color:#666;font-size:10px;line-height:1.4;';
-    note.textContent = 'Source : Ministère de l\'Intérieur — MAJ : 16/03/2026 (T1)';
+    note.textContent = 'Source : Ministère de l\'Intérieur — MAJ : 23/03/2026 (T1+T2)';
     container.appendChild(note);
   }
 
@@ -3403,16 +3456,17 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
       for (var code in mun2026) {
         var md = mun2026[code];
         if (mun2026BlocFilter) {
-          var mBloc = mun2026Year === '2020' ? (md.b20 || 'Sans étiquette') : (md.b26 || 'Sans étiquette');
+          var mBloc = mun2026Year === '2020' ? (md.b20 || 'Sans étiquette') : (md.bf || md.b26 || 'Sans étiquette');
           if (mBloc !== mun2026BlocFilter) continue;
         }
         if (md.cb === 1) munBascules++;
         if (md.nm === 1) munNouveaux++;
-        if (md.st === 'T2') munT2++;
-        if (md.pa) { munPartSum += md.pa; munPartCount++; }
+        if (md.td === 'T2') munT2++;
+        var partVal = md.td === 'T2' ? (md.pa2 || md.pa1) : md.pa1;
+        if (partVal) { munPartSum += partVal; munPartCount++; }
       }
       var munAvgPart = munPartCount > 0 ? (munPartSum / munPartCount).toFixed(1) : '0';
-      el.textContent = munBascules + ' bascules | ' + munNouveaux.toLocaleString('fr') + ' nouveaux maires | ' + munT2.toLocaleString('fr') + ' en attente T2 | Participation moy. : ' + munAvgPart + '%';
+      el.textContent = munBascules + ' bascules | ' + munNouveaux.toLocaleString('fr') + ' nouveaux maires | ' + munT2.toLocaleString('fr') + ' \u00e9lus au T2 | Participation moy. : ' + munAvgPart + '%';
     } else if (currentMode === 'epci') {
       var epciCounts = {};
       EPCI_TYPES.forEach(function(t) { epciCounts[t.key] = 0; });
@@ -3603,8 +3657,11 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     openDetail(code);
   }
 
+  var searchTimer = null;
   searchInput.addEventListener('input', function() {
-    doSearch(this.value.trim());
+    var val = this.value.trim();
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function() { doSearch(val); }, 80);
   });
 
   searchInput.addEventListener('keydown', function(e) {
@@ -3622,7 +3679,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
     } else if (e.key === 'Enter' && searchActiveIdx >= 0) {
       e.preventDefault();
       var item = items[searchActiveIdx];
-      selectCommune(item.getAttribute('data-code'), item.querySelector('span').textContent);
+      selectCommune(item.getAttribute('data-code'), item.children[0].textContent.trim());
     } else if (e.key === 'Escape') {
       searchResults.style.display = 'none';
       searchInput.blur();
