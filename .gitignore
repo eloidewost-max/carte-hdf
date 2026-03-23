@@ -1,5 +1,18 @@
-# Large source data files (not needed for the website)
+# Large source data files (générées, pas nécessaires pour le site)
 presidentielle-2022-t1-communes.csv
+resultats_municipales_2026_t1.csv
+resultats_municipales_2026.csv
+
+# Scripts de scraping (génèrent les données, pas le site)
+build_csv_t1.py
+build_csv_t2.py
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Logs
+*.log
 
 # Dependencies
 node_modules/
@@ -10,3 +23,21 @@ node_modules/
 
 # Vercel
 .vercel/
+
+# Dossiers d'outils AI/IDE
+.agent/
+.claude/
+.codebuddy/
+.codex/
+.continue/
+.cursor/
+.gemini/
+.kiro/
+.mcp.json
+.opencode/
+.playwright-mcp/
+.qoder/
+.roo/
+.trae/
+.windsurf/
+.github/
