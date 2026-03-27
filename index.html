@@ -378,7 +378,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
   ];
 
   // ─── Style functions ─────────────────────────────────────────────────────────
-  window.getStyle = function getStyleICP(feature) {
+  function getStyleICP(feature) {
     var code = feature.properties.codgeo;
     if (!hdf[code]) return STYLE_NO_DATA;
     if (!passesICPFilters(code)) return STYLE_DIMMED;
@@ -394,7 +394,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
     };
   }
 
-  window.getStyle = function getStylePolitique(feature) {
+  function getStylePolitique(feature) {
     var code = feature.properties.codgeo;
     var d = hdf[code];
     if (!d) return STYLE_NO_DATA;
@@ -409,7 +409,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
     };
   }
 
-  window.getStyle = function getStyleConnectivite(feature) {
+  function getStyleConnectivite(feature) {
     var code = feature.properties.codgeo;
     var d = hdf[code];
     if (!d) return STYLE_NO_DATA;
@@ -421,7 +421,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
     return { fillColor: color, fillOpacity: opac, weight: 0.3, color: '#9aa0ad', opacity: 0.4, dashArray: null };
   }
 
-  window.getStyle = function getStyleProspection(feature) {
+  function getStyleProspection(feature) {
     var code = feature.properties.codgeo;
     var st = communeStatuts[code];
     if (!st) return { fillColor: '#e8eaef', fillOpacity: 0.55, weight: 0.2, color: '#c8cad2', opacity: 0.4, dashArray: null };
@@ -436,7 +436,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
     };
   }
 
-  window.getStyle = function getStyle(feature) {
+  function getStyle(feature) {
     if (currentMode === 'icp')          return getStyleICP(feature);
     if (currentMode === 'politique')    return getStylePolitique(feature);
     if (currentMode === 'prospection')  return getStyleProspection(feature);
