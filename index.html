@@ -934,7 +934,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
     document.getElementById('detail-panel').classList.remove('open');
     document.getElementById('cmd-content').textContent = '';
     infoPanel.style.display = 'none';
-    if (mode === 'icp')               renderCmdICP();
+    if (mode === 'icp')               renderCmdProspection();
     else if (mode === 'politique')    renderCmdPolitique();
     else if (mode === 'prospection')  renderCmdProspection();
     else                              renderCmdConnectivite();
@@ -1778,7 +1778,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
 
   // ─── Init ─────────────────────────────────────────────────────────────────────
   document.getElementById('loading').style.display = 'none';
-  renderCmdICP();
+  renderCmdProspection();
   updateBottomBar();
   setTimeout(updateModeIndicator, 0);
 
