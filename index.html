@@ -123,10 +123,9 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
-const firebaseConfig = { apiKey: "AIzaSyDDPmIB9GmjhQJZEoMIngbXrHPyCqPDEiM", authDomain: "communes-hdf.firebaseapp.com", projectId: "communes-hdf", storageBucket: "communes-hdf.firebasestorage.app", messagingSenderId: "856187871743", appId: "1:856187871743:web:0bb4ee56e3dd7761da47ca" };
+var firebaseConfig = { apiKey: "AIzaSyDDPmIB9GmjhQJZEoMIngbXrHPyCqPDEiM", authDomain: "communes-hdf.firebaseapp.com", projectId: "communes-hdf", storageBucket: "communes-hdf.firebasestorage.app", messagingSenderId: "856187871743", appId: "1:856187871743:web:0bb4ee56e3dd7761da47ca" };
 firebase.initializeApp(firebaseConfig);
 var db = firebase.firestore();
-document.addEventListener("DOMContentLoaded", function() { db.collection("statuts").doc("communes").onSnapshot((docSnap) => { if (docSnap.exists) { var newData = JSON.stringify(docSnap.data()); if(newData !== JSON.stringify(communeStatuts)) { communeStatuts = docSnap.data(); window.location.reload(); } } }); });
 window.saveToFirebase = async function(statuts) { await db.collection("statuts").doc("communes").set(statuts); };
 </script>
 </head>
@@ -260,6 +259,17 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
   STATUTS.forEach(function(s) { STATUT_MAP[s.key] = s; });
 
   var communeStatuts = {};
+  setTimeout(function() {
+    db.collection("statuts").doc("communes").onSnapshot(function(docSnap) {
+      if (docSnap.exists) {
+        var newData = JSON.stringify(docSnap.data());
+        if (newData !== JSON.stringify(communeStatuts)) {
+          communeStatuts = docSnap.data();
+          window.location.reload();
+        }
+      }
+    });
+  }, 3000);
   function loadStatuts() {
     communeStatuts = {};
   }
@@ -767,7 +777,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
   // ─── GeoJSON layer ────────────────────────────────────────────────────────────
   var layerByCode = {};
 
-  window.geoLayer = L.geoJSON(communesGeo, {
+  var geoLayer = L.geoJSON(communesGeo, {
     style: getStyle,
     onEachFeature: function(feature, layer) {
       var code = feature.properties.codgeo;
