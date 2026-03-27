@@ -126,7 +126,7 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
 const firebaseConfig = { apiKey: "AIzaSyDDPmIB9GmjhQJZEoMIngbXrHPyCqPDEiM", authDomain: "communes-hdf.firebaseapp.com", projectId: "communes-hdf", storageBucket: "communes-hdf.firebasestorage.app", messagingSenderId: "856187871743", appId: "1:856187871743:web:0bb4ee56e3dd7761da47ca" };
 firebase.initializeApp(firebaseConfig);
 var db = firebase.firestore();
-document.addEventListener("DOMContentLoaded", function() { db.collection("statuts").doc("communes").onSnapshot((docSnap) => { if (docSnap.exists) { communeStatuts = docSnap.data(); window.location.reload(); } }); });
+document.addEventListener("DOMContentLoaded", function() { db.collection("statuts").doc("communes").onSnapshot((docSnap) => { if (docSnap.exists) { var newData = JSON.stringify(docSnap.data()); if(newData !== JSON.stringify(communeStatuts)) { communeStatuts = docSnap.data(); window.location.reload(); } } }); });
 window.saveToFirebase = async function(statuts) { await db.collection("statuts").doc("communes").set(statuts); };
 </script>
 </head>
