@@ -145,10 +145,10 @@ window.saveToFirebase = async function(statuts) { await db.collection("statuts")
       <div id="search-results"></div>
     </div>
     <div id="mode-tabs">
-      <button class="mode-btn active" data-mode="icp">Score ICP</button>
+      <button class="mode-btn" data-mode="icp">Score ICP</button>
       <button class="mode-btn" data-mode="politique">Politique</button>
       <button class="mode-btn" data-mode="connectivite">Connectivit&eacute;</button>
-      <button class="mode-btn" data-mode="prospection">Prospection</button>
+      <button class="mode-btn active" data-mode="prospection">Prospection</button>
       <div id="mode-indicator"></div>
     </div>
     <span id="region-label">Hauts-de-France &middot; 02 / 59 / 60 / 62 / 80</span>
@@ -188,7 +188,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
 
   var map = L.map('map', {
     center: [50.15, 2.8],
-    zoom: 8,
+    zoom: 9,
     zoomSnap: 0.5,
     preferCanvas: true
   });
