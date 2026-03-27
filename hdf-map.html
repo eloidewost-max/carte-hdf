@@ -260,7 +260,12 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
 
   var communeStatuts = {};
   db.collection("statuts").doc("communes").get().then(function(docSnap) {
-    if (docSnap.exists) { communeStatuts = docSnap.data(); }
+    if (docSnap.exists) {
+      communeStatuts = docSnap.data();
+      if (typeof geoLayer !== "undefined") geoLayer.setStyle(getStyle);
+      if (typeof refreshStatusLabels === "function") refreshStatusLabels();
+      if (typeof renderCmdProspection === "function") renderCmdProspection();
+    }
   });
   db.collection("statuts").doc("communes").get().then(function(docSnap) {
     if (docSnap.exists) { communeStatuts = docSnap.data(); }
