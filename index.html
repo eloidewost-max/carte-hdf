@@ -262,13 +262,16 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
   db.collection("statuts").doc("communes").get().then(function(docSnap) {
     if (docSnap.exists) { communeStatuts = docSnap.data(); }
   });
+  db.collection("statuts").doc("communes").get().then(function(docSnap) {
+    if (docSnap.exists) { communeStatuts = docSnap.data(); }
+  });
   var _fbReady = false;
   setTimeout(function() {
     db.collection("statuts").doc("communes").onSnapshot(function(docSnap) {
       if (docSnap.exists) {
         if (!_fbReady) { _fbReady = true; return; }
         communeStatuts = docSnap.data();
-        window.location.reload();
+        setTimeout(function() { window.location.reload(); }, 5000);
       }
     });
   }, 3000);
