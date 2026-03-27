@@ -127,6 +127,15 @@ var firebaseConfig = { apiKey: "AIzaSyDDPmIB9GmjhQJZEoMIngbXrHPyCqPDEiM", authDo
 firebase.initializeApp(firebaseConfig);
 var db = firebase.firestore();
 window.saveToFirebase = async function(statuts) { await db.collection("statuts").doc("communes").set(statuts); };
+window._syncFirebase = function() {
+  db.collection("statuts").doc("communes").get().then(function(docSnap) {
+    if (docSnap.exists) {
+      var newData = JSON.stringify(docSnap.data());
+      if (newData !== JSON.stringify(communeStatuts)) { window.location.reload(); }
+      else { alert("Carte déjà à jour !"); }
+    }
+  });
+};
 </script>
 </head>
 <body>
