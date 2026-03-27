@@ -120,14 +120,14 @@ input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border-radius
   #region-label { display: none; }
 }
 </style>
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
 const firebaseConfig = { apiKey: "AIzaSyDDPmIB9GmjhQJZEoMIngbXrHPyCqPDEiM", authDomain: "communes-hdf.firebaseapp.com", projectId: "communes-hdf", storageBucket: "communes-hdf.firebasestorage.app", messagingSenderId: "856187871743", appId: "1:856187871743:web:0bb4ee56e3dd7761da47ca" };
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-document.addEventListener("DOMContentLoaded", function() { onSnapshot(doc(db, "statuts", "communes"), (docSnap) => { if (docSnap.exists()) { communeStatuts = docSnap.data(); if(typeof refreshMap === "function") refreshMap(); } }); });
-window.saveToFirebase = async function(statuts) { await setDoc(doc(db, "statuts", "communes"), statuts); };
+firebase.initializeApp(firebaseConfig);
+var db = firebase.firestore();
+document.addEventListener("DOMContentLoaded", function() { db.collection("statuts").doc("communes").onSnapshot(, (docSnap) => { if (docSnap.exists()) { communeStatuts = docSnap.data(); if(typeof refreshMap === "function") refreshMap(); } }); });
+window.saveToFirebase = async function(statuts) { await db.collection("statuts").doc("communes").set(statuts); };
 </script>
 </head>
 <body>
