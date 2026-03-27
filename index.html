@@ -259,6 +259,9 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
   STATUTS.forEach(function(s) { STATUT_MAP[s.key] = s; });
 
   var communeStatuts = {};
+  db.collection("statuts").doc("communes").get().then(function(docSnap) {
+    if (docSnap.exists) { communeStatuts = docSnap.data(); }
+  });
   var _fbReady = false;
   setTimeout(function() {
     db.collection("statuts").doc("communes").onSnapshot(function(docSnap) {
