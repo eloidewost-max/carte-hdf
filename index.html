@@ -767,7 +767,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
   // ─── GeoJSON layer ────────────────────────────────────────────────────────────
   var layerByCode = {};
 
-  var geoLayer = L.geoJSON(communesGeo, {
+  window.geoLayer = L.geoJSON(communesGeo, {
     style: getStyle,
     onEachFeature: function(feature, layer) {
       var code = feature.properties.codgeo;
