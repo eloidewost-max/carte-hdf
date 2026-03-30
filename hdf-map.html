@@ -946,7 +946,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
     document.getElementById('detail-panel').classList.remove('open');
     document.getElementById('cmd-content').textContent = '';
     infoPanel.style.display = 'none';
-    if (mode === 'icp')               renderCmdProspection();
+    if (mode === 'icp')               renderCmdICP();
     else if (mode === 'politique')    renderCmdPolitique();
     else if (mode === 'prospection')  renderCmdProspection();
     else                              renderCmdConnectivite();
