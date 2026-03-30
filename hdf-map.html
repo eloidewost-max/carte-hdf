@@ -812,7 +812,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
           geoLayer.resetStyle(e.target);
         },
         click: function(e) {
-          map.fitBounds(e.target.getBounds(), { maxZoom: 9 });
+          map.fitBounds(e.target.getBounds(), { maxZoom: 10 });
           openDetail(code);
         }
       });
@@ -1625,7 +1625,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
         li.appendChild(meta);
         li.addEventListener('click', function() {
           var layer = layerByCode[code];
-          if (layer) { map.fitBounds(layer.getBounds(), { maxZoom: 9 }); openDetail(code); }
+          if (layer) { map.fitBounds(layer.getBounds(), { maxZoom: 10 }); openDetail(code); }
         });
         ul.appendChild(li);
       });
