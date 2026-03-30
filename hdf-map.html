@@ -267,10 +267,13 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
 
   // ─── Statuts commerciaux ──────────────────────────────────────────────────────
   var STATUTS = [
-    { key: 'prospectee', label: 'Prospect\u00e9e', color: '#6b7280' },
-    { key: 'en_cours',   label: 'En cours',        color: '#f97316' },
-    { key: 'partenaire', label: 'Partenaire',       color: '#22c55e' },
-    { key: 'perdu',      label: 'Deal perdu',       color: '#ef4444' }
+  { key: 'perdu',      label: 'Deal perdu',            color: '#ef4444' },
+  { key: 'prospectee', label: 'Prospectée',             color: '#6b7280' },
+  { key: 'rdv',        label: 'Rdv programmé',          color: '#3b82f6' },
+  { key: 'signature',  label: 'En cours de signature',  color: '#f97316' },
+  { key: 'signe',      label: 'Signé',                  color: '#22c55e' },
+  { key: 'prioritaire',label: 'Prioritaire',            color: '#eab308' }
+];
   ];
   var STATUT_MAP = {};
   STATUTS.forEach(function(s) { STATUT_MAP[s.key] = s; });
