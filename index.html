@@ -818,7 +818,7 @@ if (!st) {
           geoLayer.resetStyle(e.target);
         },
         click: function(e) {
-          map.fitBounds(e.target.getBounds(), { maxZoom: 10 });
+          map.fitBounds(e.target.getBounds(), { maxZoom: 11 });
           openDetail(code);
         }
       });
@@ -907,6 +907,7 @@ if (!st) {
       if (!d || !d.lat || !d.lng) continue;
       var st = STATUT_MAP[communeStatuts[code]];
       if (!st) continue;
+      if (activeStatutFilters.length > 0 && activeStatutFilters.indexOf(communeStatuts[code]) === -1) continue;
       var icon = L.divIcon({
         className: '',
         html: '<div style="text-align:center;pointer-events:none;white-space:nowrap;">'
@@ -1642,7 +1643,7 @@ if (!st) {
         li.appendChild(meta);
         li.addEventListener('click', function() {
           var layer = layerByCode[code];
-          if (layer) { map.fitBounds(layer.getBounds(), { maxZoom: 10 }); openDetail(code); }
+          if (layer) { map.fitBounds(layer.getBounds(), { maxZoom: 11 }); openDetail(code); }
         });
         ul.appendChild(li);
       });
