@@ -1584,6 +1584,7 @@ if (!st) {
         if (idx === -1) activeStatutFilters.push(st.key);
         else activeStatutFilters.splice(idx, 1);
         geoLayer.setStyle(getStyle);
+        refreshStatusLabels();
         document.getElementById('cmd-content').textContent = '';
         renderCmdProspection();
       });
