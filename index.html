@@ -1560,20 +1560,31 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
       for (var c in communeStatuts) { if (communeStatuts[c] === st.key) cnt++; }
       var row = document.createElement('div');
       row.className = 'legend-row';
+      var isActive = activeStatutFilters.indexOf(st.key) !== -1;
+      row.style.cssText = 'cursor:pointer;border-radius:4px;padding:2px 4px;transition:background 0.15s;'
+        + (isActive ? 'background:rgba(255,255,255,0.1);outline:1px solid ' + st.color + ';' : '');
       var sw = document.createElement('div');
       sw.className = 'legend-swatch';
       sw.style.background = st.color;
       row.appendChild(sw);
       var lbl = document.createElement('span');
       lbl.textContent = st.label;
+      lbl.style.fontWeight = isActive ? '700' : '400';
       row.appendChild(lbl);
       var c2 = document.createElement('span');
       c2.className = 'legend-count';
       c2.textContent = cnt;
       row.appendChild(c2);
+      row.addEventListener('click', function() {
+        var idx = activeStatutFilters.indexOf(st.key);
+        if (idx === -1) activeStatutFilters.push(st.key);
+        else activeStatutFilters.splice(idx, 1);
+        geoLayer.setStyle(getStyle);
+        document.getElementById('cmd-content').textContent = '';
+        renderCmdProspection();
+      });
       legSec.appendChild(row);
     });
-
     var grayRow = document.createElement('div');
     grayRow.className = 'legend-row';
     var graySw = document.createElement('div');
