@@ -130,9 +130,15 @@ window.saveToFirebase = async function(statuts) { await db.collection("statuts")
 window._syncFirebase = function() {
   db.collection("statuts").doc("communes").get().then(function(docSnap) {
     if (docSnap.exists) {
-      var newData = JSON.stringify(docSnap.data());
-      if (newData !== JSON.stringify(communeStatuts)) { window.location.reload(); }
-      else { alert("Carte déjà à jour !"); }
+      communeStatuts = docSnap.data();
+      if (typeof geoLayer !== "undefined") geoLayer.setStyle(getStyle);
+      if (typeof refreshStatusLabels === "function") refreshStatusLabels();
+      if (currentMode === "prospection") {
+        document.getElementById("cmd-content").textContent = "";
+        renderCmdProspection();
+      }
+      updateBottomBar();
+      alert("Sync OK !");
     }
   });
 };
