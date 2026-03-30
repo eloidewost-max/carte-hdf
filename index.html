@@ -276,14 +276,18 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
   STATUTS.forEach(function(s) { STATUT_MAP[s.key] = s; });
 
   var communeStatuts = {};
-  db.collection("statuts").doc("communes").get().then(function(docSnap) {
-    if (docSnap.exists) {
-      communeStatuts = docSnap.data();
-      if (typeof geoLayer !== "undefined") geoLayer.setStyle(getStyle);
-      if (typeof refreshStatusLabels === "function") refreshStatusLabels();
-      if (typeof renderCmdProspection === "function") renderCmdProspection();
+  db.collection("statuts").doc("communes").onSnapshot(function(docSnap) {
+  if (docSnap.exists) {
+    communeStatuts = docSnap.data();
+    if (typeof geoLayer !== "undefined") geoLayer.setStyle(getStyle);
+    if (typeof refreshStatusLabels === "function") refreshStatusLabels();
+    if (typeof renderCmdProspection === "function" && currentMode === "prospection") {
+      document.getElementById("cmd-content").textContent = "";
+      renderCmdProspection();
     }
-  });
+    updateBottomBar();
+  }
+});
   setInterval(function() { window._syncFirebase(); }, 600000);
  
   function saveStatuts() {
