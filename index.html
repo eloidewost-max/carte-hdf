@@ -284,27 +284,12 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
       if (typeof renderCmdProspection === "function") renderCmdProspection();
     }
   });
-  db.collection("statuts").doc("communes").get().then(function(docSnap) {
-    if (docSnap.exists) { communeStatuts = docSnap.data(); }
-  });
   setInterval(function() { window._syncFirebase(); }, 600000);
-  /*setInterval(function() {
-    db.collection("statuts").doc("communes").get().then(function(docSnap) {
-      if (docSnap.exists) {
-        var newData = JSON.stringify(docSnap.data());
-        if (newData !== JSON.stringify(communeStatuts)) {
-          window.location.reload();
-        }
-      }
-    });
-  }, 300000);*/
-  function loadStatuts() {
-    communeStatuts = {};
-  }
+ 
   function saveStatuts() {
     if (window.saveToFirebase) window.saveToFirebase(communeStatuts);
   }
-  loadStatuts();
+
 
   var icpUpdateTimer = null;
   function scheduleICPRefresh() {
