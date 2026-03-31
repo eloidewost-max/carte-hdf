@@ -813,12 +813,12 @@ if (!st) {
           e.target.bringToFront();
         },
         mousemove: function(e) { positionInfo(e.originalEvent); },
-        mouseout: function(e) {
+     mouseout: function(e) {
           infoPanel.style.display = 'none';
-          geoLayer.resetStyle(e.target);
+          if (window._selectedLayer !== e.target) geoLayer.resetStyle(e.target);
         },
         click: function(e) {
-          map.fitBounds(e.target.getBounds(), { maxZoom: 10 });
+          map.fitBounds(e.target.getBounds(), { maxZoom: 11 });
           if (window._selectedLayer) geoLayer.resetStyle(window._selectedLayer);
           window._selectedLayer = e.target;
           e.target.setStyle({ weight: 3, color: '#ffff00', opacity: 1 });
