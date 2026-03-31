@@ -1768,7 +1768,7 @@ if (!st) {
     searchResults.style.display = 'none';
     var layer = layerByCode[code];
     if (layer) {
-      map.fitBounds(layer.getBounds(), { maxZoom: 13, padding: [50, 50] });
+      map.fitBounds(layer.getBounds(), { maxZoom: 10, padding: [50, 50] });
       layer.setStyle({ weight: 3, color: '#fff', opacity: 1, fillOpacity: 1 });
       setTimeout(function() { geoLayer.resetStyle(layer); }, 2000);
     }
