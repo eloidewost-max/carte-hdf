@@ -222,6 +222,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
   // ─── State ───────────────────────────────────────────────────────────────────
   var currentMode  = 'prospection';
   var activeFilter = null;   // political family filter (politique + connectivite modes)
+  var activeStatutFilters = []; // filtre multi-statuts en mode prospection
   var icpScoreCache = null;
   var icpListLimit  = 200;
   var icpTopN       = 50;
@@ -267,44 +268,35 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
 
   // ─── Statuts commerciaux ──────────────────────────────────────────────────────
   var STATUTS = [
-    { key: 'prospectee', label: 'Prospect\u00e9e', color: '#6b7280' },
-    { key: 'en_cours',   label: 'En cours',        color: '#f97316' },
-    { key: 'partenaire', label: 'Partenaire',       color: '#22c55e' },
-    { key: 'perdu',      label: 'Deal perdu',       color: '#ef4444' }
-  ];
+  { key: 'perdu',      label: 'Deal perdu',            color: '#ef4444' },
+  { key: 'prospectee', label: 'Prospectée',             color: '#6b7280' },
+  { key: 'rdv',        label: 'Rdv programmé',          color: '#3b82f6' },
+  { key: 'signature',  label: 'En cours de signature',  color: '#f97316' },
+  { key: 'signe',      label: 'Signé',                  color: '#22c55e' },
+  { key: 'prioritaire',label: 'Prioritaire',            color: '#eab308' }
+];
   var STATUT_MAP = {};
   STATUTS.forEach(function(s) { STATUT_MAP[s.key] = s; });
 
   var communeStatuts = {};
-  db.collection("statuts").doc("communes").get().then(function(docSnap) {
-    if (docSnap.exists) {
-      communeStatuts = docSnap.data();
-      if (typeof geoLayer !== "undefined") geoLayer.setStyle(getStyle);
-      if (typeof refreshStatusLabels === "function") refreshStatusLabels();
-      if (typeof renderCmdProspection === "function") renderCmdProspection();
+  db.collection("statuts").doc("communes").onSnapshot(function(docSnap) {
+  if (docSnap.exists) {
+    communeStatuts = docSnap.data();
+    if (typeof geoLayer !== "undefined") geoLayer.setStyle(getStyle);
+ if (typeof refreshStatusLabels === "function" && typeof statusLabelLayer !== "undefined") refreshStatusLabels();
+    if (typeof renderCmdProspection === "function" && currentMode === "prospection") {
+      document.getElementById("cmd-content").textContent = "";
+      renderCmdProspection();
     }
-  });
-  db.collection("statuts").doc("communes").get().then(function(docSnap) {
-    if (docSnap.exists) { communeStatuts = docSnap.data(); }
-  });
-  setInterval(function() { window._syncFirebase(); }, 600000);
-  /*setInterval(function() {
-    db.collection("statuts").doc("communes").get().then(function(docSnap) {
-      if (docSnap.exists) {
-        var newData = JSON.stringify(docSnap.data());
-        if (newData !== JSON.stringify(communeStatuts)) {
-          window.location.reload();
-        }
-      }
-    });
-  }, 300000);*/
-  function loadStatuts() {
-    communeStatuts = {};
+    updateBottomBar();
   }
+});
+  setInterval(function() { window._syncFirebase(); }, 600000);
+ 
   function saveStatuts() {
     if (window.saveToFirebase) window.saveToFirebase(communeStatuts);
   }
-  loadStatuts();
+
 
   var icpUpdateTimer = null;
   function scheduleICPRefresh() {
@@ -462,8 +454,11 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
   function getStyleProspection(feature) {
     var code = feature.properties.codgeo;
     var st = communeStatuts[code];
-    if (!st) return { fillColor: '#e8eaef', fillOpacity: 0.55, weight: 0.2, color: '#c8cad2', opacity: 0.4, dashArray: null };
-    var statut = STATUT_MAP[st];
+if (!st) {
+      if (activeStatutFilters.length > 0) return STYLE_DIMMED;
+      return { fillColor: '#e8eaef', fillOpacity: 0.55, weight: 0.2, color: '#c8cad2', opacity: 0.4, dashArray: null };
+    }
+    if (activeStatutFilters.length > 0 && activeStatutFilters.indexOf(st) === -1) return STYLE_DIMMED;    var statut = STATUT_MAP[st];
     return {
       fillColor: statut ? statut.color : '#6b7280',
       fillOpacity: 0.75,
@@ -818,15 +813,18 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
           e.target.bringToFront();
         },
         mousemove: function(e) { positionInfo(e.originalEvent); },
-        mouseout: function(e) {
+     mouseout: function(e) {
           infoPanel.style.display = 'none';
-          geoLayer.resetStyle(e.target);
+          if (window._selectedLayer !== e.target) geoLayer.resetStyle(e.target);
         },
         click: function(e) {
-          map.fitBounds(e.target.getBounds(), { maxZoom: 14 });
+          map.fitBounds(e.target.getBounds(), { maxZoom: 11 });
+          if (window._selectedLayer) geoLayer.resetStyle(window._selectedLayer);
+          window._selectedLayer = e.target;
+          e.target.setStyle({ weight: 3, color: '#ffff00', opacity: 1 });
           openDetail(code);
         }
-      });
+  });
     }
   }).addTo(map);
   communesGeo = null;
@@ -912,6 +910,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
       if (!d || !d.lat || !d.lng) continue;
       var st = STATUT_MAP[communeStatuts[code]];
       if (!st) continue;
+      if (activeStatutFilters.length > 0 && activeStatutFilters.indexOf(communeStatuts[code]) === -1) continue;
       var icon = L.divIcon({
         className: '',
         html: '<div style="text-align:center;pointer-events:none;white-space:nowrap;">'
@@ -1568,20 +1567,32 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
       for (var c in communeStatuts) { if (communeStatuts[c] === st.key) cnt++; }
       var row = document.createElement('div');
       row.className = 'legend-row';
+      var isActive = activeStatutFilters.indexOf(st.key) !== -1;
+      row.style.cssText = 'cursor:pointer;border-radius:4px;padding:2px 4px;transition:background 0.15s;'
+        + (isActive ? 'background:rgba(255,255,255,0.1);outline:1px solid ' + st.color + ';' : '');
       var sw = document.createElement('div');
       sw.className = 'legend-swatch';
       sw.style.background = st.color;
       row.appendChild(sw);
       var lbl = document.createElement('span');
       lbl.textContent = st.label;
+      lbl.style.fontWeight = isActive ? '700' : '400';
       row.appendChild(lbl);
       var c2 = document.createElement('span');
       c2.className = 'legend-count';
       c2.textContent = cnt;
       row.appendChild(c2);
+      row.addEventListener('click', function() {
+        var idx = activeStatutFilters.indexOf(st.key);
+        if (idx === -1) activeStatutFilters.push(st.key);
+        else activeStatutFilters.splice(idx, 1);
+        geoLayer.setStyle(getStyle);
+        refreshStatusLabels();
+        document.getElementById('cmd-content').textContent = '';
+        renderCmdProspection();
+      });
       legSec.appendChild(row);
     });
-
     var grayRow = document.createElement('div');
     grayRow.className = 'legend-row';
     var graySw = document.createElement('div');
@@ -1636,7 +1647,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
         li.appendChild(meta);
         li.addEventListener('click', function() {
           var layer = layerByCode[code];
-          if (layer) { map.fitBounds(layer.getBounds(), { maxZoom: 14 }); openDetail(code); }
+          if (layer) { map.fitBounds(layer.getBounds(), { maxZoom: 11 }); openDetail(code); }
         });
         ul.appendChild(li);
       });
@@ -1760,7 +1771,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
     searchResults.style.display = 'none';
     var layer = layerByCode[code];
     if (layer) {
-      map.fitBounds(layer.getBounds(), { maxZoom: 13, padding: [50, 50] });
+      map.fitBounds(layer.getBounds(), { maxZoom: 11, padding: [50, 50] });
       layer.setStyle({ weight: 3, color: '#fff', opacity: 1, fillOpacity: 1 });
       setTimeout(function() { geoLayer.resetStyle(layer); }, 2000);
     }
