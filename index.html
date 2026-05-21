@@ -281,6 +281,19 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
   STATUTS.forEach(function(s) { STATUT_MAP[s.key] = s; });
 
   var communeStatuts = {};
+  var communeVisites = {}; // 'avenir' ou 'faite'
+
+  // Synchro visites Firebase
+  db.collection("statuts").doc("visites").onSnapshot(function(docSnap) {
+    if (docSnap.exists) {
+      communeVisites = docSnap.data();
+      if (typeof refreshVisiteLabels === "function" && typeof visiteLabelLayer !== "undefined") refreshVisiteLabels();
+    }
+  });
+
+  window.saveVisites = function() {
+    db.collection("statuts").doc("visites").set(communeVisites);
+  };
   db.collection("statuts").doc("communes").onSnapshot(function(docSnap) {
   if (docSnap.exists) {
     communeStatuts = docSnap.data();
@@ -584,6 +597,44 @@ if (!st) {
     headerSec.appendChild(popEl);
 
     content.appendChild(headerSec);
+
+    // ── Visite terrain ──
+    var visiteSec = document.createElement('div');
+    visiteSec.className = 'detail-section';
+    var visiteTitle = document.createElement('div');
+    visiteTitle.className = 'cmd-section-title';
+    visiteTitle.style.marginBottom = '8px';
+    visiteTitle.textContent = 'VISITE TERRAIN';
+    visiteSec.appendChild(visiteTitle);
+
+    var visiteBtns = document.createElement('div');
+    visiteBtns.style.cssText = 'display:flex;gap:6px;';
+
+    function renderVisiteBtns() {
+      visiteBtns.textContent = '';
+      var current = communeVisites[code];
+      [
+        { key: 'avenir', label: '🚗 À venir', color: '#ef4444' },
+        { key: 'faite',  label: '🚗 Faite',   color: '#22c55e' }
+      ].forEach(function(v) {
+        var btn = document.createElement('button');
+        btn.textContent = v.label;
+        var isActive = current === v.key;
+        btn.style.cssText = 'flex:1;padding:6px 8px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;'
+          + (isActive ? 'background:' + v.color + ';border:1px solid ' + v.color + ';color:#fff;' : 'background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.12);color:#9ca3af;');
+        btn.addEventListener('click', function() {
+          if (communeVisites[code] === v.key) delete communeVisites[code];
+          else communeVisites[code] = v.key;
+          window.saveVisites();
+          refreshVisiteLabels();
+          renderVisiteBtns();
+        });
+        visiteBtns.appendChild(btn);
+      });
+    }
+    renderVisiteBtns();
+    visiteSec.appendChild(visiteBtns);
+    content.appendChild(visiteSec);
 
     // ── Statut commercial ──
     var statutSec = document.createElement('div');
@@ -904,6 +955,25 @@ if (!st) {
 
   // ─── Labels statuts commerciaux ───────────────────────────────────────────────
   var statusLabelLayer = L.layerGroup().addTo(map);
+  var visiteLabelLayer = L.layerGroup().addTo(map);
+
+  function refreshVisiteLabels() {
+    visiteLabelLayer.clearLayers();
+    for (var code in communeVisites) {
+      var d = hdf[code];
+      if (!d || !d.lat || !d.lng) continue;
+      var type = communeVisites[code];
+      var color = type === 'faite' ? '#22c55e' : '#ef4444';
+      var icon = L.divIcon({
+        className: '',
+        html: '<div style="font-size:16px;text-shadow:0 1px 3px rgba(255,255,255,0.9);" title="Visite ' + (type === 'faite' ? 'faite' : 'à venir') + '">🚗</div>',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+      L.marker([d.lat, d.lng], { icon: icon, interactive: false, keyboard: false })
+        .addTo(visiteLabelLayer);
+    }
+  }
 
   function refreshStatusLabels() {
     statusLabelLayer.clearLayers();
