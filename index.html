@@ -281,7 +281,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
   STATUTS.forEach(function(s) { STATUT_MAP[s.key] = s; });
 
   var communeStatuts = {};
-  var communeVisites = {}; // 'avenir' ou 'faite'
+  var communeVisites = {}; // { code: { avenir: true/false, faite: true/false } }
 
   // Synchro visites Firebase
   db.collection("statuts").doc("visites").onSnapshot(function(docSnap) {
@@ -612,19 +612,20 @@ if (!st) {
 
     function renderVisiteBtns() {
       visiteBtns.textContent = '';
-      var current = communeVisites[code];
+      var current = communeVisites[code] || {};
       [
         { key: 'avenir', label: '🪖 À venir', color: '#ef4444' },
         { key: 'faite',  label: '👑 Faite',   color: '#22c55e' }
       ].forEach(function(v) {
         var btn = document.createElement('button');
         btn.textContent = v.label;
-        var isActive = current === v.key;
+        var isActive = !!current[v.key];
         btn.style.cssText = 'flex:1;padding:6px 8px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;'
           + (isActive ? 'background:' + v.color + ';border:1px solid ' + v.color + ';color:#fff;' : 'background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.12);color:#9ca3af;');
         btn.addEventListener('click', function() {
-          if (communeVisites[code] === v.key) delete communeVisites[code];
-          else communeVisites[code] = v.key;
+          if (!communeVisites[code]) communeVisites[code] = {};
+          communeVisites[code][v.key] = !communeVisites[code][v.key];
+          if (!communeVisites[code].avenir && !communeVisites[code].faite) delete communeVisites[code];
           window.saveVisites();
           refreshVisiteLabels();
           renderVisiteBtns();
@@ -962,13 +963,17 @@ if (!st) {
     for (var code in communeVisites) {
       var d = hdf[code];
       if (!d || !d.lat || !d.lng) continue;
-      var type = communeVisites[code];
-      var color = type === 'faite' ? '#22c55e' : '#ef4444';
+      var v = communeVisites[code] || {};
+      if (!v.avenir && !v.faite) continue;
+      var html = '<div style="font-size:16px;text-shadow:0 1px 3px rgba(255,255,255,0.9);white-space:nowrap;">';
+      if (v.avenir) html += '🪖';
+      if (v.faite)  html += '👑';
+      html += '</div>';
       var icon = L.divIcon({
         className: '',
-        html: '<div style="font-size:16px;text-shadow:0 1px 3px rgba(255,255,255,0.9);" title="Visite ' + (type === 'faite' ? 'faite' : 'à venir') + '">" + (type === 'faite' ? '👑' : '🪖') + "</div>',
-        iconSize: [20, 20],
-        iconAnchor: [10, 10]
+        html: html,
+        iconSize: [40, 20],
+        iconAnchor: [20, 10]
       });
       L.marker([d.lat, d.lng], { icon: icon, interactive: false, keyboard: false })
         .addTo(visiteLabelLayer);
