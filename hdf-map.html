@@ -969,15 +969,15 @@ if (!st) {
       if (!d || !d.lat || !d.lng) continue;
       var v = communeVisites[code] || {};
       if (!v.avenir && !v.faite) continue;
-      var html = '<div style="font-size:16px;text-shadow:0 1px 3px rgba(255,255,255,0.9);white-space:nowrap;">';
+      var html = '<div style="font-size:28px;text-shadow:0 1px 3px rgba(255,255,255,0.9);white-space:nowrap;">';
       if (v.avenir) html += '🪖';
       if (v.faite)  html += '👑';
       html += '</div>';
       var icon = L.divIcon({
         className: '',
         html: html,
-        iconSize: [40, 20],
-        iconAnchor: [20, 10]
+        iconSize: [60, 30],
+        iconAnchor: [30, 15]
       });
       L.marker([d.lat, d.lng], { icon: icon, interactive: false, keyboard: false })
         .addTo(visiteLabelLayer);
