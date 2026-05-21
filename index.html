@@ -1732,6 +1732,74 @@ if (!st) {
       container.appendChild(sec);
     });
 
+    // Section visites terrain
+    var nbAvenir = 0, nbFaite = 0;
+    for (var c in communeVisites) {
+      var v = communeVisites[c] || {};
+      if (v.avenir) nbAvenir++;
+      if (v.faite)  nbFaite++;
+    }
+
+    if (nbAvenir + nbFaite > 0) {
+      var visiteSec2 = document.createElement('div');
+      visiteSec2.className = 'cmd-section';
+      var visiteTitle2 = document.createElement('div');
+      visiteTitle2.className = 'cmd-section-title';
+      visiteTitle2.textContent = 'VISITES TERRAIN';
+      visiteSec2.appendChild(visiteTitle2);
+
+      [
+        { key: 'avenir', label: '🪖 À venir', color: '#ef4444', count: nbAvenir },
+        { key: 'faite',  label: '👑 Faites',  color: '#22c55e', count: nbFaite }
+      ].forEach(function(vtype) {
+        if (vtype.count === 0) return;
+        var secV = document.createElement('div');
+        secV.className = 'cmd-section';
+        var titleV = document.createElement('div');
+        titleV.className = 'cmd-section-title';
+        titleV.style.color = vtype.color;
+        titleV.textContent = vtype.label + ' (' + vtype.count + ')';
+        secV.appendChild(titleV);
+
+        var ul = document.createElement('ul');
+        ul.className = 'prospect-list';
+        for (var code in communeVisites) {
+          var vv = communeVisites[code] || {};
+          if (!vv[vtype.key]) continue;
+          var d = hdf[code];
+          if (!d) continue;
+          var li = document.createElement('li');
+          li.className = 'prospect-row';
+          li.style.gridTemplateColumns = '1fr auto';
+          var nameDiv = document.createElement('div');
+          nameDiv.className = 'prospect-name';
+          var dot = document.createElement('div');
+          dot.className = 'prospect-dot';
+          dot.style.background = vtype.color;
+          var txt = document.createElement('span');
+          txt.className = 'prospect-name-text';
+          txt.textContent = d.n;
+          nameDiv.appendChild(dot);
+          nameDiv.appendChild(txt);
+          var meta = document.createElement('div');
+          meta.className = 'prospect-meta';
+          meta.textContent = (d.pop || 0).toLocaleString('fr') + ' hab.';
+          li.appendChild(nameDiv);
+          li.appendChild(meta);
+          (function(c) {
+            li.addEventListener('click', function() {
+              var layer = layerByCode[c];
+              if (layer) { map.fitBounds(layer.getBounds(), { maxZoom: 11 }); openDetail(c); }
+            });
+          })(code);
+          ul.appendChild(li);
+        }
+        secV.appendChild(ul);
+        visiteSec2.appendChild(secV);
+      });
+      container.appendChild(visiteSec2);
+    }
+
     if (Object.keys(communeStatuts).length === 0) {
       var emptySec = document.createElement('div');
       emptySec.className = 'cmd-section';
