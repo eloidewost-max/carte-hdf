@@ -288,6 +288,10 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
     if (docSnap.exists) {
       communeVisites = docSnap.data();
       if (typeof refreshVisiteLabels === "function" && typeof visiteLabelLayer !== "undefined") refreshVisiteLabels();
+      if (typeof renderCmdProspection === "function" && currentMode === "prospection") {
+        document.getElementById("cmd-content").textContent = "";
+        renderCmdProspection();
+      }
     }
   });
 
