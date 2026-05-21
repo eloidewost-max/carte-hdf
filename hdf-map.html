@@ -614,8 +614,8 @@ if (!st) {
       visiteBtns.textContent = '';
       var current = communeVisites[code];
       [
-        { key: 'avenir', label: '🚗 À venir', color: '#ef4444' },
-        { key: 'faite',  label: '🚗 Faite',   color: '#22c55e' }
+        { key: 'avenir', label: '🪖 À venir', color: '#ef4444' },
+        { key: 'faite',  label: '👑 Faite',   color: '#22c55e' }
       ].forEach(function(v) {
         var btn = document.createElement('button');
         btn.textContent = v.label;
@@ -966,7 +966,7 @@ if (!st) {
       var color = type === 'faite' ? '#22c55e' : '#ef4444';
       var icon = L.divIcon({
         className: '',
-        html: '<div style="font-size:16px;text-shadow:0 1px 3px rgba(255,255,255,0.9);" title="Visite ' + (type === 'faite' ? 'faite' : 'à venir') + '">🚗</div>',
+        html: '<div style="font-size:16px;text-shadow:0 1px 3px rgba(255,255,255,0.9);" title="Visite ' + (type === 'faite' ? 'faite' : 'à venir') + '">" + (type === 'faite' ? '👑' : '🪖') + "</div>',
         iconSize: [20, 20],
         iconAnchor: [10, 10]
       });
