@@ -1650,6 +1650,15 @@ if (!st) {
   // ─── renderCmdProspection ─────────────────────────────────────────────────────
   function renderCmdProspection() {
     var container = document.getElementById('cmd-content');
+    // Bouton sauvegarde JSON
+    var saveSec = document.createElement('div');
+    saveSec.className = 'cmd-section';
+    var saveBtn = document.createElement('button');
+    saveBtn.textContent = '💾 Sauvegarder une copie';
+    saveBtn.style.cssText = 'width:100%;padding:7px 10px;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:5px;color:#eab308;font-size:12px;font-weight:600;cursor:pointer;';
+    saveBtn.addEventListener('click', exportJSON);
+    saveSec.appendChild(saveBtn);
+    container.appendChild(saveSec);
 
     // Légende statuts
     var legSec = document.createElement('div');
