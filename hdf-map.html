@@ -313,7 +313,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
   setInterval(function() { window._syncFirebase(); }, 600000);
  
   function saveStatuts() {
-    if (window.saveToFirebase) window.saveToFirebase(communeStatuts);
+  if (window.saveToFirebase && Object.keys(communeStatuts).length > 0) window.saveToFirebase(communeStatuts);
   }
 
 
