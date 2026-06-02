@@ -170,6 +170,11 @@ window._syncFirebase = function() {
       <button class="mode-btn" data-mode="icp">Score ICP</button>
       <div id="mode-indicator"></div>
     </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-left:8px;">
+      <span style="font-size:11px;color:#7e22ce;font-weight:700;white-space:nowrap;">📅 RDV du</span>
+      <input type="date" id="global-rdv-date" style="padding:5px 8px;border:1px solid #a855f7;border-radius:6px;font-size:12px;color:#374151;cursor:pointer;">
+      <button id="global-rdv-clear" style="padding:5px 8px;border:1px solid rgba(0,0,0,0.15);border-radius:6px;background:#fff;font-size:11px;cursor:pointer;color:#9ca3af;display:none;">✕</button>
+    </div>
     <button onclick="window._syncFirebase()" style="padding:6px 12px;border:1px solid rgba(0,0,0,0.15);border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:#374151;margin-left:8px;">⟳ Sync</button>
     <span id="region-label">Hauts-de-France &middot; 02 / 59 / 60 / 62 / 80</span>
   </div>
@@ -858,7 +863,7 @@ if (!st) {
     // ── Date RDV (en bas) ──
     var rdvSec = document.createElement('div');
     rdvSec.className = 'detail-section';
-    rdvSec.style.cssText = 'border-top:2px solid rgba(249,115,22,0.25);padding-top:14px;margin-top:4px;';
+    rdvSec.style.cssText = 'border-top:2px solid rgba(168,85,247,0.25);padding-top:14px;margin-top:4px;';
     var rdvTitle = document.createElement('div');
     rdvTitle.className = 'cmd-section-title';
     rdvTitle.style.marginBottom = '10px';
@@ -890,9 +895,9 @@ if (!st) {
     var rdvSameDayBtn = document.createElement('button');
     rdvSameDayBtn.style.cssText = 'margin-top:10px;width:100%;padding:10px 14px;border-radius:7px;'
       + 'font-size:13px;font-weight:700;cursor:pointer;display:none;'
-      + 'background:#fff7ed;border:2px solid #f97316;color:#c2410c;transition:all 0.15s;';
-    rdvSameDayBtn.addEventListener('mouseenter', function() { this.style.background='#f97316'; this.style.color='#fff'; });
-    rdvSameDayBtn.addEventListener('mouseleave', function() { this.style.background='#fff7ed'; this.style.color='#c2410c'; });
+      + 'background:#faf5ff;border:2px solid #a855f7;color:#7e22ce;transition:all 0.15s;';
+    rdvSameDayBtn.addEventListener('mouseenter', function() { this.style.background='#a855f7'; this.style.color='#fff'; });
+    rdvSameDayBtn.addEventListener('mouseleave', function() { this.style.background='#faf5ff'; this.style.color='#7e22ce'; });
     var rdvListTitle = document.createElement('div');
     rdvListTitle.style.cssText = 'font-size:11px;font-weight:700;color:#9ca3af;letter-spacing:0.5px;'
       + 'text-transform:uppercase;margin-top:10px;margin-bottom:6px;display:none;';
@@ -1021,8 +1026,8 @@ if (!st) {
       var h = Math.floor(secs / 3600);
       var m = Math.round((secs % 3600) / 60);
       var dur = h > 0 ? h + 'h' + String(m).padStart(2,'0') : m + ' min';
-      var fromName = layerByCode[fromCode] ? (layerByCode[fromCode].feature.properties.libgeo || fromCode) : fromCode;
-      var toName   = toFeature ? (toFeature.properties.libgeo || toCode) : toCode;
+      var fromName = (hdf[fromCode] && hdf[fromCode].n) ? hdf[fromCode].n : fromCode;
+      var toName   = (hdf[toCode] && hdf[toCode].n) ? hdf[toCode].n : toCode;
       var coords = decodePolyline(route.geometry);
       var poly = L.polyline(coords, { color: '#ef4444', weight: 4, opacity: 0.85 }).addTo(map);
       var midPoint = coords[Math.floor(coords.length / 2)];
@@ -1067,7 +1072,7 @@ if (!st) {
     codes.forEach(function(c) {
       var layer = layerByCode[c];
       if (layer) {
-        layer.setStyle({ weight: 5, color: '#f97316', opacity: 1, fillColor: '#fbbf24', fillOpacity: 0.75 });
+        layer.setStyle({ weight: 5, color: '#7e22ce', opacity: 1, fillColor: '#a855f7', fillOpacity: 0.8 });
         var elem = layer.getElement ? layer.getElement() : null;
         if (elem) elem.classList.add('rdv-highlight-pulse');
         rdvHighlightLayers.push({ layer: layer, elem: elem });
@@ -1076,9 +1081,9 @@ if (!st) {
     var badge = document.createElement('div');
     badge.id = 'rdv-highlight-badge';
     badge.style.cssText = 'position:fixed;top:52px;left:50%;transform:translateX(-50%);'
-      + 'background:#f97316;color:#fff;padding:8px 20px;border-radius:10px;font-size:13px;'
+      + 'background:#a855f7;color:#fff;padding:8px 20px;border-radius:10px;font-size:13px;'
       + 'font-weight:700;z-index:9999;display:flex;align-items:center;gap:12px;'
-      + 'box-shadow:0 4px 16px rgba(249,115,22,0.4);';
+      + 'box-shadow:0 4px 16px rgba(168,85,247,0.4);';
     badge.innerHTML = '\ud83d\udcc5 ' + codes.length + ' rdv le ' + formatDate(dateVal)
       + ' <button onclick="clearRdvHighlight()" style="background:rgba(255,255,255,0.25);border:none;color:#fff;'
       + 'cursor:pointer;font-size:12px;padding:3px 8px;border-radius:5px;">\u2715 Fermer</button>';
@@ -1088,18 +1093,18 @@ if (!st) {
       var communes = [];
       codes.forEach(function(c) {
         var layer = layerByCode[c];
-        var name = layer ? (layer.feature.properties.libgeo || c) : c;
+        var name = (hdf[c] && hdf[c].n) ? hdf[c].n : c;
         communes.push({ code: c, name: name });
       });
       communes.sort(function(a, b) { return a.name.localeCompare(b.name); });
       communes.forEach(function(com) {
         var li = document.createElement('div');
         li.style.cssText = 'padding:5px 8px;border-radius:5px;cursor:pointer;font-size:12px;'
-          + 'color:#1e2025;background:rgba(249,115,22,0.08);margin-bottom:3px;'
-          + 'border:1px solid rgba(249,115,22,0.2);font-weight:500;';
+          + 'color:#1e2025;background:rgba(168,85,247,0.08);margin-bottom:3px;'
+          + 'border:1px solid rgba(168,85,247,0.25);font-weight:500;';
         li.textContent = '\ud83d\udccd ' + com.name;
-        li.addEventListener('mouseenter', function() { this.style.background = 'rgba(249,115,22,0.18)'; });
-        li.addEventListener('mouseleave', function() { this.style.background = 'rgba(249,115,22,0.08)'; });
+        li.addEventListener('mouseenter', function() { this.style.background = 'rgba(168,85,247,0.18)'; });
+        li.addEventListener('mouseleave', function() { this.style.background = 'rgba(168,85,247,0.08)'; });
         li.addEventListener('click', function() {
           var layer = layerByCode[com.code];
           if (layer) { map.fitBounds(layer.getBounds(), { maxZoom: 11 }); openDetail(com.code); }
@@ -1151,6 +1156,27 @@ if (!st) {
     }
   }).addTo(map);
   communesGeo = null;
+
+  // Selecteur de date global (top-bar)
+  (function initGlobalRdvDate() {
+    var input = document.getElementById('global-rdv-date');
+    var clearBtn = document.getElementById('global-rdv-clear');
+    if (!input) return;
+    input.addEventListener('change', function() {
+      if (input.value) {
+        highlightSameDay(input.value, null);
+        clearBtn.style.display = 'inline-block';
+      } else {
+        clearRdvHighlight();
+        clearBtn.style.display = 'none';
+      }
+    });
+    clearBtn.addEventListener('click', function() {
+      input.value = '';
+      clearRdvHighlight();
+      clearBtn.style.display = 'none';
+    });
+  })();
 
   // ─── Couche frontières départementales ───────────────────────────────────
   L.geoJSON(DEPT_BOUNDARIES, {
