@@ -1056,9 +1056,8 @@ if (!st) {
 
   function clearRdvHighlight() {
     rdvHighlightDate = null;
-    // Restaure le style normal de TOUTES les communes estompees
     rdvHighlightLayers.forEach(function(info) {
-      if (info.layer) geoLayer.resetStyle(info.layer);
+      geoLayer.resetStyle(info.layer);
       if (info.elem) info.elem.classList.remove('rdv-highlight-pulse');
     });
     rdvHighlightLayers = [];
@@ -1070,30 +1069,15 @@ if (!st) {
     clearRdvHighlight();
     rdvHighlightDate = dateVal;
     var codes = Object.keys(communeRdv).filter(function(c) { return communeRdv[c] === dateVal; });
-    var codeSet = {};
-    codes.forEach(function(c) { codeSet[c] = true; });
-
-    // Estompe toutes les communes SANS rdv ce jour-la (les communes du jour restent intactes)
-    var bounds = null;
-    Object.keys(layerByCode).forEach(function(c) {
+    codes.forEach(function(c) {
       var layer = layerByCode[c];
-      if (!layer) return;
-      if (codeSet[c]) {
-        // Commune du jour : on ne touche pas a son style, on l'ajoute juste au cadrage
-        rdvHighlightLayers.push({ layer: layer, elem: null });
-        if (bounds) { bounds.extend(layer.getBounds()); } else { bounds = L.latLngBounds(layer.getBounds()); }
-      } else {
-        // Autre commune : estompee
-        layer.setStyle({ fillOpacity: 0.08, opacity: 0.15 });
-        rdvHighlightLayers.push({ layer: layer, elem: null });
+      if (layer) {
+        layer.setStyle({ weight: 5, color: '#7e22ce', opacity: 1, fillColor: '#a855f7', fillOpacity: 0.8 });
+        var elem = layer.getElement ? layer.getElement() : null;
+        if (elem) elem.classList.add('rdv-highlight-pulse');
+        rdvHighlightLayers.push({ layer: layer, elem: elem });
       }
     });
-
-    // Zoom auto sur l'ensemble des communes du jour
-    if (bounds && bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 12 });
-    }
-
     var badge = document.createElement('div');
     badge.id = 'rdv-highlight-badge';
     badge.style.cssText = 'position:fixed;top:52px;left:50%;transform:translateX(-50%);'
@@ -1104,11 +1088,11 @@ if (!st) {
       + ' <button onclick="clearRdvHighlight()" style="background:rgba(255,255,255,0.25);border:none;color:#fff;'
       + 'cursor:pointer;font-size:12px;padding:3px 8px;border-radius:5px;">\u2715 Fermer</button>';
     document.body.appendChild(badge);
-
     if (listContainer) {
       listContainer.innerHTML = '';
       var communes = [];
       codes.forEach(function(c) {
+        var layer = layerByCode[c];
         var name = (hdf[c] && hdf[c].n) ? hdf[c].n : c;
         communes.push({ code: c, name: name });
       });
