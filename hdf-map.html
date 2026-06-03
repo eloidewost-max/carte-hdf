@@ -1204,7 +1204,7 @@ if (!st) {
   communesGeo = null;
 
   // Selecteur de date global (top-bar)
-  (function initGlobalRdvDate() {
+  function initGlobalRdvDate() {
     var input = document.getElementById('global-rdv-date');
     var clearBtn = document.getElementById('global-rdv-clear');
     var dateBtn = document.getElementById('global-rdv-btn');
@@ -1269,7 +1269,12 @@ if (!st) {
       if (listMenu.style.display !== 'block') return;
       if (!listMenu.contains(e.target) && !listBtn.contains(e.target)) listMenu.style.display = 'none';
     });
-  })();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGlobalRdvDate);
+  } else {
+    initGlobalRdvDate();
+  }
 
   // ─── Couche frontières départementales ───────────────────────────────────
   L.geoJSON(DEPT_BOUNDARIES, {
