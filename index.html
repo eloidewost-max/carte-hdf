@@ -1014,7 +1014,7 @@ if (!st) {
     routeBanner.style.display = 'flex';
     var url = 'https://router.project-osrm.org/route/v1/driving/'
       + fromLatLng[1] + ',' + fromLatLng[0] + ';' + toLatLng[1] + ',' + toLatLng[0]
-      + '?overview=full&geometries=polyline';
+      + '?overview=full&geometries=geojson';
     try {
       var resp = await fetch(url);
       var data = await resp.json();
@@ -1028,7 +1028,7 @@ if (!st) {
       var dur = h > 0 ? h + 'h' + String(m).padStart(2,'0') : m + ' min';
       var fromName = (hdf[fromCode] && hdf[fromCode].n) ? hdf[fromCode].n : fromCode;
       var toName   = (hdf[toCode] && hdf[toCode].n) ? hdf[toCode].n : toCode;
-      var coords = decodePolyline(route.geometry);
+      var coords = route.geometry.coordinates.map(function(pt) { return [pt[1], pt[0]]; });
       var poly = L.polyline(coords, { color: '#ef4444', weight: 4, opacity: 0.85 }).addTo(map);
       var midPoint = coords[Math.floor(coords.length / 2)];
       L.popup({ closeButton: false })
