@@ -41,3 +41,17 @@ node_modules/
 .trae/
 .windsurf/
 .github/
+
+# Backups et scripts de patch (gardés en local uniquement)
+*.bak
+*.bak2
+*.bak3
+*.bak4
+*.bak5
+*.bak6
+*.bak7
+hdf-map.html.bak*
+hdf-map.backup.html
+patch_hdf*.py
+Patch - Juin 2026/
+.DS_Store
