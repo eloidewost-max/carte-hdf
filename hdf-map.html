@@ -1030,8 +1030,9 @@ if (!st) {
       var dur = h > 0 ? h + 'h' + String(m).padStart(2,'0') : m + ' min';
       var fromName = (hdf[fromCode] && hdf[fromCode].n) ? hdf[fromCode].n : fromCode;
       var toName   = (hdf[toCode] && hdf[toCode].n) ? hdf[toCode].n : toCode;
-      var coords = route.geometry.coordinates.map(function(pt) { return [pt[1], pt[0]]; });
-      var poly = L.polyline(coords, { color: '#ef4444', weight: 4, opacity: 0.85 }).addTo(map);
+      // Ligne droite entre les deux communes (temps/distance restent ceux d'OSRM, fiables)
+      var coords = [fromLatLng, toLatLng];
+      var poly = L.polyline(coords, { color: '#ef4444', weight: 3, opacity: 0.85, dashArray: '8, 6' }).addTo(map);
       poly.bindTooltip('\ud83d\ude97 ' + dur + ' \u00b7 ' + dist, {
         permanent: true, direction: 'center', className: 'route-seg-label'
       }).openTooltip();
