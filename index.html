@@ -9,6 +9,8 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 @keyframes rdv-pulse { 0% { opacity: 1; } 50% { opacity: 0.45; } 100% { opacity: 1; } }
 .rdv-highlight-pulse { animation: rdv-pulse 1.2s ease-in-out infinite; }
+.route-seg-label { background:#fff; border:1px solid #ef4444; border-radius:6px; padding:2px 7px; font-size:11px; font-weight:700; color:#ef4444; box-shadow:0 1px 4px rgba(0,0,0,0.2); }
+.route-seg-label::before { display:none; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f4f5f9; color: #1e2025; font-size: 13px; line-height: 1.4; }
 
 #app { display: grid; grid-template-rows: 44px 1fr 28px; grid-template-columns: 340px 1fr; height: 100vh; width: 100vw; }
@@ -1030,11 +1032,9 @@ if (!st) {
       var toName   = (hdf[toCode] && hdf[toCode].n) ? hdf[toCode].n : toCode;
       var coords = route.geometry.coordinates.map(function(pt) { return [pt[1], pt[0]]; });
       var poly = L.polyline(coords, { color: '#ef4444', weight: 4, opacity: 0.85 }).addTo(map);
-      var midPoint = coords[Math.floor(coords.length / 2)];
-      L.popup({ closeButton: false })
-        .setLatLng(midPoint)
-        .setContent('<div style="font-size:12px;font-weight:700;color:#ef4444;">\ud83d\ude97 ' + dur + ' \u00b7 ' + dist + '</div>')
-        .openOn(map);
+      poly.bindTooltip('\ud83d\ude97 ' + dur + ' \u00b7 ' + dist, {
+        permanent: true, direction: 'center', className: 'route-seg-label'
+      }).openTooltip();
       routeSegments.push({ polyline: poly, dur: dur, dist: dist, fromName: fromName, toName: toName });
       updateRouteBanner();
     } catch(err) {
