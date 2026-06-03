@@ -512,7 +512,11 @@ if (!st) {
     };
   }
 
+  var STYLE_GEND = { fillColor: '#3b82f6', fillOpacity: 0.25, weight: 3, color: '#1e3a8a', opacity: 0.95, dashArray: null };
   function getStyle(feature) {
+    // Villes chef-lieu gendarmerie sans statut : contour bleu bien visible
+    var _c = feature.properties.codgeo;
+    if (hdf[_c] && hdf[_c].gend && !communeStatuts[_c] && currentMode === 'prospection') return STYLE_GEND;
     if (currentMode === 'icp')          return getStyleICP(feature);
     if (currentMode === 'politique')    return getStylePolitique(feature);
     if (currentMode === 'prospection')  return getStyleProspection(feature);
@@ -1296,8 +1300,8 @@ if (!st) {
             + 'text-shadow:0 1px 2px rgba(255,255,255,0.95),0 0 6px rgba(255,255,255,0.9);">'
             + d.n + '</span>'
             + '</div>',
-        iconSize: [120, 36],
-        iconAnchor: [60, 18]
+        iconSize: [140, 44],
+        iconAnchor: [70, 44]
       });
       L.marker([d.lat, d.lng], { icon: icon, interactive: false, keyboard: false })
         .addTo(gendLabelLayer);
