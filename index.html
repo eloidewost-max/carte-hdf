@@ -1011,6 +1011,7 @@ if (!st) {
   async function calcRoute(fromCode, toCode, toFeature) {
     var fromLatLng = getCentroid(fromCode);
     var toLatLng   = getCentroid(toCode);
+    console.log("[TRAJET]", fromCode, (hdf[fromCode]||{}).n, JSON.stringify(fromLatLng), "=>", toCode, (hdf[toCode]||{}).n, JSON.stringify(toLatLng));
     if (!fromLatLng || !toLatLng) { alert("Impossible de localiser une commune."); return; }
     routeText.textContent = '\u23f3 Calcul du trajet\u2026';
     routeBanner.style.display = 'flex';
