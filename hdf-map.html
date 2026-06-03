@@ -173,10 +173,8 @@ window._syncFirebase = function() {
       <div id="mode-indicator"></div>
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-left:8px;">
-      <label id="global-rdv-btn" style="position:relative;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:9px;background:#7e22ce;color:#fff;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(126,34,206,0.35);">
-        📅 Choisir une date
-        <input type="date" id="global-rdv-date" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;">
-      </label>
+      <button type="button" id="global-rdv-btn" style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:9px;border:none;background:#7e22ce;color:#fff;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(126,34,206,0.35);">📅 Choisir une date</button>
+      <input type="date" id="global-rdv-date" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;">
       <div style="position:relative;display:inline-block;">
         <button id="global-rdv-list-btn" style="padding:9px 16px;border-radius:9px;border:2px solid #a855f7;background:#faf5ff;color:#7e22ce;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;">📋 RDV programmés ▾</button>
         <div id="global-rdv-list-menu" style="display:none;position:absolute;top:110%;left:0;z-index:99999;background:#fff;border:1px solid rgba(0,0,0,0.15);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.18);min-width:230px;max-height:340px;overflow-y:auto;padding:6px;"></div>
@@ -1158,6 +1156,10 @@ if (!st) {
           if (rdvHighlightDate && communeRdv[code] !== rdvHighlightDate) {
             return;
           }
+          if (rdvHighlightDate && communeRdv[code] === rdvHighlightDate) {
+            e.target.bringToFront();
+            return;
+          }
           e.target.setStyle({ weight: 2, color: '#fff', opacity: 1 });
           e.target.bringToFront();
         },
@@ -1168,6 +1170,10 @@ if (!st) {
           // Si une date est active et que cette commune n'a pas de rdv ce jour, re-estomper
           if (rdvHighlightDate && communeRdv[code] !== rdvHighlightDate) {
             e.target.setStyle({ fillOpacity: 0.08, opacity: 0.15 });
+            return;
+          }
+          if (rdvHighlightDate && communeRdv[code] === rdvHighlightDate) {
+            e.target.setStyle({ weight: 4, color: '#7e22ce', opacity: 1 });
             return;
           }
           geoLayer.resetStyle(e.target);
@@ -1201,7 +1207,12 @@ if (!st) {
   (function initGlobalRdvDate() {
     var input = document.getElementById('global-rdv-date');
     var clearBtn = document.getElementById('global-rdv-clear');
+    var dateBtn = document.getElementById('global-rdv-btn');
     if (!input) return;
+    if (dateBtn) dateBtn.addEventListener('click', function() {
+      if (typeof input.showPicker === 'function') { try { input.showPicker(); return; } catch(e) {} }
+      input.focus(); input.click();
+    });
     input.addEventListener('change', function() {
       if (input.value) {
         highlightSameDay(input.value, null);
@@ -1255,7 +1266,8 @@ if (!st) {
       listMenu.style.display = 'block';
     });
     document.addEventListener('click', function(e) {
-      if (!listMenu.contains(e.target) && e.target !== listBtn) listMenu.style.display = 'none';
+      if (listMenu.style.display !== 'block') return;
+      if (!listMenu.contains(e.target) && !listBtn.contains(e.target)) listMenu.style.display = 'none';
     });
   })();
 
