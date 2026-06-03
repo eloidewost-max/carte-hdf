@@ -1140,13 +1140,23 @@ if (!st) {
         mouseover: function(e) {
           showInfo(feature);
           positionInfo(e.originalEvent);
+          // Si une date est active et que cette commune n'a pas de rdv ce jour, garder l'estompage
+          if (rdvHighlightDate && communeRdv[code] !== rdvHighlightDate) {
+            return;
+          }
           e.target.setStyle({ weight: 2, color: '#fff', opacity: 1 });
           e.target.bringToFront();
         },
         mousemove: function(e) { positionInfo(e.originalEvent); },
      mouseout: function(e) {
           infoPanel.style.display = 'none';
-          if (window._selectedLayer !== e.target) geoLayer.resetStyle(e.target);
+          if (window._selectedLayer === e.target) return;
+          // Si une date est active et que cette commune n'a pas de rdv ce jour, re-estomper
+          if (rdvHighlightDate && communeRdv[code] !== rdvHighlightDate) {
+            e.target.setStyle({ fillOpacity: 0.08, opacity: 0.15 });
+            return;
+          }
+          geoLayer.resetStyle(e.target);
         },
         click: function(e) {
           if (e.originalEvent.metaKey || e.originalEvent.ctrlKey) {

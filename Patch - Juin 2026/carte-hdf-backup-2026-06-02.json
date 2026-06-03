@@ -1,0 +1,190 @@
+{
+  "date": "2026-06-02T16:34:19.862Z",
+  "statuts": {
+    "59036": "rdv_fait",
+    "59218": "prioritaire",
+    "59238": "rdv_fait",
+    "59316": "rdv_fait",
+    "59345": "perdu",
+    "59445": "rdv_fait",
+    "59470": "rdv_avenir",
+    "59523": "prioritaire",
+    "59550": "prospectee",
+    "59581": "perdu",
+    "59631": "perdu",
+    "59659": "prioritaire",
+    "59670": "rdv_fait",
+    "60074": "rdv_fait",
+    "60106": "perdu_rdv",
+    "60135": "signe",
+    "60138": "rdv_fait",
+    "60140": "rdv_avenir",
+    "60217": "rdv_fait",
+    "60245": "perdu_rdv",
+    "60250": "prioritaire",
+    "60308": "perdu",
+    "60313": "perdu",
+    "60326": "perdu_rdv",
+    "60385": "rdv_fait",
+    "60424": "perdu",
+    "60454": "rdv_fait",
+    "60500": "perdu",
+    "60504": "rdv_fait",
+    "60616": "prioritaire",
+    "60639": "rdv_fait",
+    "60666": "rdv_fait",
+    "60695": "perdu",
+    "62060": "rdv_avenir",
+    "62341": "rdv_fait",
+    "62881": "perdu",
+    "80234": "perdu_rdv",
+    "80253": "prospectee",
+    "80436": "rdv_avenir",
+    "80476": "rdv_fait",
+    "80573": "rdv_avenir",
+    "80630": "prioritaire",
+    "80632": "perdu_rdv",
+    "80649": "perdu_rdv",
+    "80711": "rdv_fait",
+    "80736": "rdv_fait",
+    "02018": "perdu",
+    "02083": "rdv_fait",
+    "02818": "rdv_fait",
+    "02011": "rdv_fait",
+    "02328": "prioritaire",
+    "02770": "perdu",
+    "02750": "rdv_fait",
+    "02290": "prioritaire",
+    "02111": "prioritaire",
+    "02567": "rdv_fait",
+    "02520": "prioritaire",
+    "02452": "prioritaire",
+    "02145": "prioritaire",
+    "02483": "rdv_avenir",
+    "02419": "perdu",
+    "02816": "perdu",
+    "02799": "perdu",
+    "02166": "rdv_avenir",
+    "02456": "perdu",
+    "02134": "perdu",
+    "02602": "perdu",
+    "02686": "rdv_avenir",
+    "02363": "rdv_fait",
+    "02512": "signature",
+    "02672": "perdu",
+    "02372": "prioritaire",
+    "02238": "rdv_fait",
+    "02671": "perdu",
+    "02258": "rdv_fait",
+    "02593": "rdv_avenir",
+    "02462": "rdv_avenir",
+    "02423": "rdv_fait",
+    "02544": "rdv_fait",
+    "02518": "perdu",
+    "02093": "rdv_avenir",
+    "02339": "rdv_fait",
+    "02374": "prioritaire",
+    "02336": "prioritaire",
+    "02705": "prioritaire",
+    "02064": "rdv_avenir",
+    "02649": "rdv_fait",
+    "02086": "perdu",
+    "02085": "rdv_fait",
+    "02719": "perdu",
+    "02089": "rdv_avenir",
+    "02789": "rdv_avenir",
+    "02549": "prioritaire",
+    "02049": "prospectee",
+    "02288": "perdu",
+    "02185": "rdv_fait",
+    "02780": "prioritaire"
+  },
+  "visites": {
+    "59470": {
+      "avenir": true
+    },
+    "60074": {
+      "avenir": true
+    },
+    "60138": {
+      "avenir": true
+    },
+    "60385": {
+      "avenir": true,
+      "faite": true
+    },
+    "60454": {
+      "avenir": true
+    },
+    "60504": {
+      "avenir": true
+    },
+    "80573": {
+      "avenir": true
+    },
+    "80630": {
+      "avenir": true
+    },
+    "02185": {
+      "avenir": true,
+      "faite": true
+    },
+    "02593": {
+      "avenir": true
+    },
+    "02544": {
+      "avenir": true
+    },
+    "02789": {
+      "avenir": true
+    },
+    "02462": {
+      "avenir": true
+    },
+    "02423": {
+      "faite": true,
+      "avenir": false
+    },
+    "02089": {
+      "avenir": true
+    },
+    "02483": {
+      "avenir": true
+    },
+    "02085": {
+      "avenir": true
+    },
+    "02649": {
+      "avenir": true
+    },
+    "02064": {
+      "avenir": true
+    },
+    "02258": {
+      "faite": true
+    },
+    "02238": {
+      "avenir": false,
+      "faite": true
+    },
+    "02203": {
+      "avenir": true
+    },
+    "02011": {
+      "faite": true,
+      "avenir": false
+    },
+    "02093": {
+      "avenir": true
+    },
+    "02339": {
+      "faite": true
+    },
+    "02686": {
+      "avenir": true
+    },
+    "02363": {
+      "avenir": true
+    }
+  }
+}
