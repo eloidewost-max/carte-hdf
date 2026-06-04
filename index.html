@@ -173,9 +173,7 @@ window._syncFirebase = function() {
       <div id="mode-indicator"></div>
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-left:8px;">
-      <button type="button" id="global-rdv-btn" style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:9px;border:none;background:#7e22ce;color:#fff;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(126,34,206,0.35);">📅 Choisir une date</button>
-      <input type="date" id="global-rdv-date" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;">
-      <div style="position:relative;display:inline-block;">
+      <div style="display:none;position:relative;display:inline-block;">
         <button id="global-rdv-list-btn" style="padding:9px 16px;border-radius:9px;border:2px solid #a855f7;background:#faf5ff;color:#7e22ce;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;">📋 RDV programmés ▾</button>
         <div id="global-rdv-list-menu" style="display:none;position:absolute;top:110%;left:0;z-index:99999;background:#fff;border:1px solid rgba(0,0,0,0.15);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,0.18);min-width:230px;max-height:340px;overflow-y:auto;padding:6px;"></div>
       </div>
@@ -2066,6 +2064,62 @@ if (!st) {
     saveSec.appendChild(saveBtn);
     container.appendChild(saveSec);
 
+    // --- Boutons RDV (date + liste des dates) ---
+    var rdvSec = document.createElement('div');
+    rdvSec.className = 'cmd-section';
+    var pickWrap = document.createElement('div');
+    pickWrap.style.cssText = 'position:relative;width:100%;margin-bottom:6px;';
+    var pickBtn = document.createElement('button');
+    pickBtn.textContent = '\ud83d\udcc5 Choisir une date';
+    pickBtn.style.cssText = 'width:100%;padding:9px 10px;background:#7e22ce;border:none;border-radius:7px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;';
+    var pickInput = document.createElement('input');
+    pickInput.type = 'date';
+    pickInput.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;';
+    pickInput.addEventListener('change', function() {
+      if (pickInput.value) { highlightSameDay(pickInput.value, null); clearRdvBtn.style.display = 'block'; }
+      else { clearRdvHighlight(); clearRdvBtn.style.display = 'none'; }
+    });
+    pickWrap.appendChild(pickBtn);
+    pickWrap.appendChild(pickInput);
+    rdvSec.appendChild(pickWrap);
+
+    var listWrap = document.createElement('div');
+    listWrap.style.cssText = 'position:relative;width:100%;margin-bottom:6px;';
+    var listBtn2 = document.createElement('button');
+    listBtn2.textContent = '\ud83d\udccb RDV programm\u00e9s \u25be';
+    listBtn2.style.cssText = 'width:100%;padding:9px 10px;background:#faf5ff;border:2px solid #a855f7;border-radius:7px;color:#7e22ce;font-size:13px;font-weight:700;cursor:pointer;';
+    var listMenu2 = document.createElement('div');
+    listMenu2.style.cssText = 'display:none;margin-top:4px;background:#fff;border:1px solid rgba(0,0,0,0.12);border-radius:8px;max-height:260px;overflow-y:auto;padding:4px;';
+    function frD(iso){ var p=iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+    listBtn2.addEventListener('click', function() {
+      if (listMenu2.style.display === 'block') { listMenu2.style.display='none'; return; }
+      listMenu2.innerHTML='';
+      var counts={};
+      Object.keys(communeRdv).forEach(function(c){ var dt=communeRdv[c]; if(dt) counts[dt]=(counts[dt]||0)+1; });
+      var dates=Object.keys(counts).sort();
+      if (dates.length===0){ var e=document.createElement('div'); e.style.cssText='padding:10px;color:#9ca3af;font-size:12px;text-align:center;'; e.textContent='Aucun RDV programm\u00e9'; listMenu2.appendChild(e); }
+      else dates.forEach(function(dt){
+        var it=document.createElement('button');
+        it.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;padding:8px 10px;border:none;background:transparent;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;color:#374151;text-align:left;';
+        it.onmouseover=function(){ it.style.background='#f3e8ff'; };
+        it.onmouseout=function(){ it.style.background='transparent'; };
+        it.innerHTML='<span>\ud83d\udcc5 '+frD(dt)+'</span><span style="background:#7e22ce;color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;">'+counts[dt]+'</span>';
+        it.addEventListener('click', function(){ pickInput.value=dt; highlightSameDay(dt,null); clearRdvBtn.style.display='block'; listMenu2.style.display='none'; });
+        listMenu2.appendChild(it);
+      });
+      listMenu2.style.display='block';
+    });
+    listWrap.appendChild(listBtn2);
+    rdvSec.appendChild(listWrap);
+    rdvSec.appendChild(listMenu2);
+
+    var clearRdvBtn = document.createElement('button');
+    clearRdvBtn.textContent = '\u2715 Effacer la date';
+    clearRdvBtn.style.cssText = 'display:none;width:100%;padding:7px 10px;background:#fff;border:1px solid rgba(0,0,0,0.15);border-radius:7px;color:#6b7280;font-size:12px;font-weight:600;cursor:pointer;';
+    clearRdvBtn.addEventListener('click', function(){ pickInput.value=''; clearRdvHighlight(); clearRdvBtn.style.display='none'; });
+    rdvSec.appendChild(clearRdvBtn);
+    container.appendChild(rdvSec);
+
     // Légende statuts
     var legSec = document.createElement('div');
     legSec.className = 'cmd-section';
@@ -2132,11 +2186,24 @@ if (!st) {
       var secTitle = document.createElement('div');
       secTitle.className = 'cmd-section-title';
       secTitle.style.color = st.color;
-      secTitle.textContent = st.label.toUpperCase() + ' (' + items.length + ')';
+      secTitle.style.cursor = 'pointer';
+      secTitle.style.userSelect = 'none';
+      var chevron = document.createElement('span');
+      chevron.textContent = '\u25be ';
+      chevron.style.cssText = 'display:inline-block;width:14px;transition:transform 0.15s;';
+      secTitle.appendChild(chevron);
+      var titleTxt = document.createElement('span');
+      titleTxt.textContent = st.label.toUpperCase() + ' (' + items.length + ')';
+      secTitle.appendChild(titleTxt);
       sec.appendChild(secTitle);
 
       var ul = document.createElement('ul');
       ul.className = 'prospect-list';
+      secTitle.addEventListener('click', function() {
+        var hidden = ul.style.display === 'none';
+        ul.style.display = hidden ? '' : 'none';
+        chevron.textContent = hidden ? '\u25be ' : '\u25b8 ';
+      });
       items.forEach(function(code) {
         var d = hdf[code];
         var li = document.createElement('li');
