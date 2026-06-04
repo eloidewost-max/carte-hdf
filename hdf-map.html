@@ -235,6 +235,7 @@ var HDF_BG_GEO = {"type":"FeatureCollection","features":[{"type":"Feature","geom
   var currentMode  = 'prospection';
   var activeFilter = null;   // political family filter (politique + connectivite modes)
   var activeStatutFilters = []; // filtre multi-statuts en mode prospection
+  var collapsedStatuts = {}; // memorise les categories repliees dans le panneau gauche
   var communeRdv = {}; // dates de rdv par commune { code: "YYYY-MM-DD" }
   var rdvHighlightDate = null; // date surbrillance mode C
   var routeSegments = []; // segments tracés
@@ -2074,10 +2075,14 @@ if (!st) {
     pickBtn.style.cssText = 'width:100%;padding:9px 10px;background:#7e22ce;border:none;border-radius:7px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;';
     var pickInput = document.createElement('input');
     pickInput.type = 'date';
-    pickInput.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;';
+    pickInput.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;opacity:0;';
     pickInput.addEventListener('change', function() {
       if (pickInput.value) { highlightSameDay(pickInput.value, null); clearRdvBtn.style.display = 'block'; }
       else { clearRdvHighlight(); clearRdvBtn.style.display = 'none'; }
+    });
+    pickBtn.addEventListener('click', function() {
+      if (typeof pickInput.showPicker === 'function') { try { pickInput.showPicker(); return; } catch(e) {} }
+      pickInput.focus(); pickInput.click();
     });
     pickWrap.appendChild(pickBtn);
     pickWrap.appendChild(pickInput);
@@ -2199,11 +2204,19 @@ if (!st) {
 
       var ul = document.createElement('ul');
       ul.className = 'prospect-list';
-      secTitle.addEventListener('click', function() {
-        var hidden = ul.style.display === 'none';
-        ul.style.display = hidden ? '' : 'none';
-        chevron.textContent = hidden ? '\u25be ' : '\u25b8 ';
-      });
+      // Restaurer l'etat repli/deplie memorise
+      if (collapsedStatuts[st.key]) {
+        ul.style.display = 'none';
+        chevron.textContent = '\u25b8 ';
+      }
+      (function(stKey){
+        secTitle.addEventListener('click', function() {
+          var hidden = ul.style.display === 'none';
+          ul.style.display = hidden ? '' : 'none';
+          chevron.textContent = hidden ? '\u25be ' : '\u25b8 ';
+          collapsedStatuts[stKey] = !hidden;
+        });
+      })(st.key);
       items.forEach(function(code) {
         var d = hdf[code];
         var li = document.createElement('li');
