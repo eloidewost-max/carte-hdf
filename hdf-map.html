@@ -2068,25 +2068,11 @@ if (!st) {
     // --- Boutons RDV (date + liste des dates) ---
     var rdvSec = document.createElement('div');
     rdvSec.className = 'cmd-section';
-    var pickWrap = document.createElement('div');
-    pickWrap.style.cssText = 'position:relative;width:100%;margin-bottom:6px;';
-    var pickBtn = document.createElement('button');
-    pickBtn.textContent = '\ud83d\udcc5 Choisir une date';
-    pickBtn.style.cssText = 'width:100%;padding:9px 10px;background:#7e22ce;border:none;border-radius:7px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;';
+    // input date cache, pilote par le menu RDV programmes et le clic sur une date
     var pickInput = document.createElement('input');
     pickInput.type = 'date';
-    pickInput.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;opacity:0;';
-    pickInput.addEventListener('change', function() {
-      if (pickInput.value) { highlightSameDay(pickInput.value, null); clearRdvBtn.style.display = 'block'; }
-      else { clearRdvHighlight(); clearRdvBtn.style.display = 'none'; }
-    });
-    pickBtn.addEventListener('click', function() {
-      if (typeof pickInput.showPicker === 'function') { try { pickInput.showPicker(); return; } catch(e) {} }
-      pickInput.focus(); pickInput.click();
-    });
-    pickWrap.appendChild(pickBtn);
-    pickWrap.appendChild(pickInput);
-    rdvSec.appendChild(pickWrap);
+    pickInput.style.cssText = 'display:none;';
+    rdvSec.appendChild(pickInput);
 
     var listWrap = document.createElement('div');
     listWrap.style.cssText = 'position:relative;width:100%;margin-bottom:6px;';
@@ -2273,11 +2259,29 @@ if (!st) {
         var titleV = document.createElement('div');
         titleV.className = 'cmd-section-title';
         titleV.style.color = vtype.color;
-        titleV.textContent = vtype.label + ' (' + vtype.count + ')';
+        titleV.style.cursor = 'pointer';
+        titleV.style.userSelect = 'none';
+        var chevronV = document.createElement('span');
+        chevronV.textContent = '\u25be ';
+        chevronV.style.cssText = 'display:inline-block;width:14px;';
+        titleV.appendChild(chevronV);
+        var titleVtxt = document.createElement('span');
+        titleVtxt.textContent = vtype.label + ' (' + vtype.count + ')';
+        titleV.appendChild(titleVtxt);
         secV.appendChild(titleV);
 
         var ul = document.createElement('ul');
         ul.className = 'prospect-list';
+        var vKey = 'visite_' + vtype.key;
+        if (collapsedStatuts[vKey]) { ul.style.display = 'none'; chevronV.textContent = '\u25b8 '; }
+        (function(k, ulRef, chevRef){
+          titleV.addEventListener('click', function() {
+            var hidden = ulRef.style.display === 'none';
+            ulRef.style.display = hidden ? '' : 'none';
+            chevRef.textContent = hidden ? '\u25be ' : '\u25b8 ';
+            collapsedStatuts[k] = !hidden;
+          });
+        })(vKey, ul, chevronV);
         for (var code in communeVisites) {
           var vv = communeVisites[code] || {};
           if (!vv[vtype.key]) continue;
