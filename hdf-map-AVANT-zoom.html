@@ -1018,7 +1018,6 @@ if (!st) {
   async function calcRoute(fromCode, toCode, toFeature) {
     var fromLatLng = getCentroid(fromCode);
     var toLatLng   = getCentroid(toCode);
-    console.log("[TRAJET]", fromCode, (hdf[fromCode]||{}).n, JSON.stringify(fromLatLng), "=>", toCode, (hdf[toCode]||{}).n, JSON.stringify(toLatLng));
     if (!fromLatLng || !toLatLng) { alert("Impossible de localiser une commune."); return; }
     routeText.textContent = '\u23f3 Calcul du trajet\u2026';
     routeBanner.style.display = 'flex';
@@ -1190,9 +1189,7 @@ if (!st) {
               return;
             }
           }
-          if (e.originalEvent.shiftKey) {
-            map.fitBounds(e.target.getBounds(), { maxZoom: 10, padding: [30, 30] });
-          }
+          map.fitBounds(e.target.getBounds(), { maxZoom: 11 });
           if (window._selectedLayer) geoLayer.resetStyle(window._selectedLayer);
           window._selectedLayer = e.target;
           e.target.setStyle({ weight: 3, color: '#ffff00', opacity: 1 });
@@ -1204,78 +1201,6 @@ if (!st) {
   }).addTo(map);
   communesGeo = null;
 
-  // Selecteur de date global (top-bar)
-  function initGlobalRdvDate() {
-    var input = document.getElementById('global-rdv-date');
-    var clearBtn = document.getElementById('global-rdv-clear');
-    var dateBtn = document.getElementById('global-rdv-btn');
-    if (!input) return;
-    if (dateBtn) dateBtn.addEventListener('click', function() {
-      if (typeof input.showPicker === 'function') { try { input.showPicker(); return; } catch(e) {} }
-      input.focus(); input.click();
-    });
-    input.addEventListener('change', function() {
-      if (input.value) {
-        highlightSameDay(input.value, null);
-        clearBtn.style.display = 'inline-block';
-      } else {
-        clearRdvHighlight();
-        clearBtn.style.display = 'none';
-      }
-    });
-    clearBtn.addEventListener('click', function() {
-      input.value = '';
-      clearRdvHighlight();
-      clearBtn.style.display = 'none';
-    });
-    // --- Menu deroulant des dates de RDV programmes ---
-    var listBtn = document.getElementById('global-rdv-list-btn');
-    var listMenu = document.getElementById('global-rdv-list-menu');
-    function frDate(iso) { var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
-    function buildRdvMenu() {
-      listMenu.innerHTML = '';
-      var counts = {};
-      Object.keys(communeRdv).forEach(function(c) { var dt = communeRdv[c]; if (dt) counts[dt] = (counts[dt]||0)+1; });
-      var dates = Object.keys(counts).sort();
-      if (dates.length === 0) {
-        var empty = document.createElement('div');
-        empty.style.cssText = 'padding:12px;color:#9ca3af;font-size:13px;text-align:center;';
-        empty.textContent = 'Aucun RDV programme';
-        listMenu.appendChild(empty);
-        return;
-      }
-      dates.forEach(function(dt) {
-        var item = document.createElement('button');
-        item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:transparent;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;color:#374151;text-align:left;';
-        item.onmouseover = function() { item.style.background = '#f3e8ff'; };
-        item.onmouseout = function() { item.style.background = 'transparent'; };
-        item.innerHTML = '<span>\ud83d\udcc5 ' + frDate(dt) + '</span>'
-          + '<span style="background:#7e22ce;color:#fff;border-radius:10px;padding:2px 9px;font-size:12px;">' + counts[dt] + '</span>';
-        item.addEventListener('click', function() {
-          input.value = dt;
-          highlightSameDay(dt, null);
-          clearBtn.style.display = 'inline-block';
-          listMenu.style.display = 'none';
-        });
-        listMenu.appendChild(item);
-      });
-    }
-    listBtn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      if (listMenu.style.display === 'block') { listMenu.style.display = 'none'; return; }
-      buildRdvMenu();
-      listMenu.style.display = 'block';
-    });
-    document.addEventListener('click', function(e) {
-      if (listMenu.style.display !== 'block') return;
-      if (!listMenu.contains(e.target) && !listBtn.contains(e.target)) listMenu.style.display = 'none';
-    });
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initGlobalRdvDate);
-  } else {
-    initGlobalRdvDate();
-  }
 
   // ─── Couche frontières départementales ───────────────────────────────────
   L.geoJSON(DEPT_BOUNDARIES, {
@@ -2433,35 +2358,15 @@ if (!st) {
     }
   }
 
-  var _lastSearchDept = null;
-  var _searchPulseTimer = null;
   function selectCommune(code, name) {
     searchInput.value = name;
     searchResults.style.display = 'none';
     var layer = layerByCode[code];
-    var dept = String(code).substring(0, 2);
     if (layer) {
-      if (_searchPulseTimer) { clearTimeout(_searchPulseTimer); _searchPulseTimer = null; }
-      if (_lastSearchDept !== null && dept === _lastSearchDept) {
-        // Meme departement que la derniere recherche : on ne bouge pas, clignotement jaune fluo
-        var pulses = 0;
-        (function pulse() {
-          layer.setStyle({ weight: 5, color: '#ffff00', opacity: 1, fillColor: '#ffff00', fillOpacity: 0.85 });
-          layer.bringToFront();
-          _searchPulseTimer = setTimeout(function() {
-            geoLayer.resetStyle(layer);
-            pulses++;
-            if (pulses < 5) { _searchPulseTimer = setTimeout(pulse, 320); }
-          }, 320);
-        })();
-      } else {
-        // Departement different (ou premiere recherche) : on se centre, zoom leger
-        map.fitBounds(layer.getBounds(), { maxZoom: 10, padding: [30, 30] });
-        layer.setStyle({ weight: 3, color: '#fff', opacity: 1, fillOpacity: 1 });
-        setTimeout(function() { geoLayer.resetStyle(layer); }, 2000);
-      }
+      map.fitBounds(layer.getBounds(), { maxZoom: 11, padding: [50, 50] });
+      layer.setStyle({ weight: 3, color: '#fff', opacity: 1, fillOpacity: 1 });
+      setTimeout(function() { geoLayer.resetStyle(layer); }, 2000);
     }
-    _lastSearchDept = dept;
     openDetail(code);
   }
 

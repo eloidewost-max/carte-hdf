@@ -2433,35 +2433,15 @@ if (!st) {
     }
   }
 
-  var _lastSearchDept = null;
-  var _searchPulseTimer = null;
   function selectCommune(code, name) {
     searchInput.value = name;
     searchResults.style.display = 'none';
     var layer = layerByCode[code];
-    var dept = String(code).substring(0, 2);
     if (layer) {
-      if (_searchPulseTimer) { clearTimeout(_searchPulseTimer); _searchPulseTimer = null; }
-      if (_lastSearchDept !== null && dept === _lastSearchDept) {
-        // Meme departement que la derniere recherche : on ne bouge pas, clignotement jaune fluo
-        var pulses = 0;
-        (function pulse() {
-          layer.setStyle({ weight: 5, color: '#ffff00', opacity: 1, fillColor: '#ffff00', fillOpacity: 0.85 });
-          layer.bringToFront();
-          _searchPulseTimer = setTimeout(function() {
-            geoLayer.resetStyle(layer);
-            pulses++;
-            if (pulses < 5) { _searchPulseTimer = setTimeout(pulse, 320); }
-          }, 320);
-        })();
-      } else {
-        // Departement different (ou premiere recherche) : on se centre, zoom leger
-        map.fitBounds(layer.getBounds(), { maxZoom: 10, padding: [30, 30] });
-        layer.setStyle({ weight: 3, color: '#fff', opacity: 1, fillOpacity: 1 });
-        setTimeout(function() { geoLayer.resetStyle(layer); }, 2000);
-      }
+      map.fitBounds(layer.getBounds(), { maxZoom: 12, padding: [20, 20] });
+      layer.setStyle({ weight: 3, color: '#fff', opacity: 1, fillOpacity: 1 });
+      setTimeout(function() { geoLayer.resetStyle(layer); }, 2000);
     }
-    _lastSearchDept = dept;
     openDetail(code);
   }
 
