@@ -1454,7 +1454,8 @@ if (!st) {
     var data = {
       date: new Date().toISOString(),
       statuts: communeStatuts,
-      visites: communeVisites
+      visites: communeVisites,
+      rdv: communeRdv
     };
     var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
