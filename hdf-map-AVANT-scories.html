@@ -169,7 +169,6 @@ window._syncFirebase = function() {
       <button class="mode-btn active" data-mode="prospection">Prospection</button>
       <button class="mode-btn" data-mode="politique">Politique</button>
       <button class="mode-btn" data-mode="connectivite">Connectivit&eacute;</button>
-      <button class="mode-btn" data-mode="icp">Score ICP</button>
       <div id="mode-indicator"></div>
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-left:8px;">
@@ -520,7 +519,6 @@ if (!st) {
     // Villes chef-lieu gendarmerie sans statut : contour bleu bien visible
     var _c = feature.properties.codgeo;
     if (hdf[_c] && hdf[_c].gend && !communeStatuts[_c] && currentMode === 'prospection') return STYLE_GEND;
-    if (currentMode === 'icp')          return getStyleICP(feature);
     if (currentMode === 'politique')    return getStylePolitique(feature);
     if (currentMode === 'prospection')  return getStyleProspection(feature);
     return getStyleConnectivite(feature);
@@ -543,10 +541,7 @@ if (!st) {
     var code = feature.properties.codgeo;
     var d = hdf[code];
     infoName.textContent = (d ? d.n : code) + ' (' + code + ')';
-    if (currentMode === 'icp') {
-      var score = computeICPScore(code);
-      infoMetric.textContent = score !== null ? 'Score ICP : ' + score + '/100' : 'N/A';
-    } else if (currentMode === 'politique') {
+    if (currentMode === 'politique') {
       infoMetric.textContent = d ? (d.lb || d.f || 'Non class\u00e9') : 'Pas de donn\u00e9es';
     } else if (currentMode === 'prospection') {
       var st = communeStatuts[code];
@@ -732,143 +727,6 @@ if (!st) {
     statutSec.appendChild(statutBtns);
     content.appendChild(statutSec);
 
-    // ── ICP Score ──
-    var icpResult = computeICPScore(code, true);
-    if (icpResult) {
-      var icpSec = document.createElement('div');
-      icpSec.className = 'detail-section';
-
-      var icpTitle = document.createElement('div');
-      icpTitle.className = 'cmd-section-title';
-      icpTitle.textContent = 'SCORE ICP';
-      icpSec.appendChild(icpTitle);
-
-      var scoreBig = document.createElement('div');
-      scoreBig.className = 'detail-score-big';
-      scoreBig.style.color = getThresholdColor(icpResult.score, ICP_COLORS);
-      scoreBig.textContent = icpResult.score + '/100';
-      icpSec.appendChild(scoreBig);
-
-      var sigSubtitle = document.createElement('div');
-      sigSubtitle.style.cssText = 'font-size:11px;color:#555;margin:8px 0 6px;';
-      sigSubtitle.textContent = 'D\u00e9tail des signaux actifs';
-      icpSec.appendChild(sigSubtitle);
-
-      icpResult.detail.forEach(function(sig) {
-        if (sig.weight === 0) return;
-        var row = document.createElement('div');
-        row.className = 'detail-signal-row';
-        row.title = sig.desc;
-
-        var lbl = document.createElement('span');
-        lbl.className = 'detail-signal-label';
-        lbl.textContent = sig.label;
-        row.appendChild(lbl);
-
-        var barBg = document.createElement('div');
-        barBg.className = 'detail-signal-bar-bg';
-        var barFill = document.createElement('div');
-        barFill.className = 'detail-signal-bar-fill';
-        barFill.style.width = Math.round(sig.raw * 100) + '%';
-        barFill.style.background = '#4ecdc4';
-        barBg.appendChild(barFill);
-        row.appendChild(barBg);
-
-        var contrib = document.createElement('span');
-        contrib.className = 'detail-signal-contrib';
-        contrib.textContent = '+' + sig.contrib;
-        row.appendChild(contrib);
-
-        icpSec.appendChild(row);
-      });
-
-
-      content.appendChild(icpSec);
-    }
-
-    // ── Police municipale ──
-    var pmSec = document.createElement('div');
-    pmSec.className = 'detail-section';
-    var pmTitle = document.createElement('div');
-    pmTitle.className = 'cmd-section-title';
-    pmTitle.textContent = 'POLICE MUNICIPALE';
-    pmSec.appendChild(pmTitle);
-
-    var pmTotal = (d.pm || 0) + (d.asvp || 0);
-    var pmRatio = d.pop > 0 ? (pmTotal / d.pop * 10000).toFixed(1) : '0';
-    [
-      { label: 'Agents PM',          value: (d.pm || 0).toString() },
-      { label: 'ASVP',               value: (d.asvp || 0).toString() },
-      { label: 'Ratio /10k hab.',    value: pmRatio },
-      { label: 'Stationnement payant', value: d.stat ? 'Oui' : 'Non' }
-    ].forEach(function(kv) {
-      var row = document.createElement('div');
-      row.className = 'detail-kv';
-      var lbl = document.createElement('span'); lbl.className = 'detail-kv-label'; lbl.textContent = kv.label;
-      var val = document.createElement('span'); val.className = 'detail-kv-value'; val.textContent = kv.value;
-      row.appendChild(lbl); row.appendChild(val);
-      pmSec.appendChild(row);
-    });
-    content.appendChild(pmSec);
-
-    // ── Connectivité ──
-    var connSec = document.createElement('div');
-    connSec.className = 'detail-section';
-    var connTitle = document.createElement('div');
-    connTitle.className = 'cmd-section-title';
-    connTitle.textContent = 'CONNECTIVIT\u00c9';
-    connSec.appendChild(connTitle);
-
-    var connBadges = document.createElement('div');
-    connBadges.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;';
-
-    function mkConnBadge(label, active, color) {
-      var b = document.createElement('span');
-      b.className = 'detail-badge';
-      b.style.cssText = active
-        ? 'background:' + color + '22;color:' + color + ';border:1px solid ' + color + '55;'
-        : 'background:rgba(0,0,0,0.04);color:#9ca3af;border:1px solid rgba(0,0,0,0.1);';
-      b.textContent = label;
-      return b;
-    }
-    connBadges.appendChild(mkConnBadge('5G',    !!d['5g'],  '#4ecdc4'));
-    connBadges.appendChild(mkConnBadge('4G',    !!d['4g'],  '#3a7bd5'));
-    connBadges.appendChild(mkConnBadge('Fibre', !!d.fibre,  '#8E24AA'));
-    connSec.appendChild(connBadges);
-    content.appendChild(connSec);
-
-    // ── Données économiques ──
-    var ecoSec = document.createElement('div');
-    ecoSec.className = 'detail-section';
-    var ecoTitle = document.createElement('div');
-    ecoTitle.className = 'cmd-section-title';
-    ecoTitle.textContent = 'DONN\u00c9ES \u00c9CONOMIQUES';
-    ecoSec.appendChild(ecoTitle);
-
-    var ecoRows = [];
-    if (d.rev)  ecoRows.push({ label: 'Revenu m\u00e9dian',   value: d.rev.toLocaleString('fr') + '\u00a0\u20ac' });
-    if (d.pauv) ecoRows.push({ label: 'Taux pauvret\u00e9',   value: d.pauv + '\u00a0%' });
-    if (d.dgf)  ecoRows.push({ label: 'DGF / habitant',       value: d.dgf.toFixed(0) + '\u00a0\u20ac' });
-    if (d.acc)       ecoRows.push({ label: 'Accidents corp. (total)', value: d.acc.toString() });
-    if (d.crime_r != null) ecoRows.push({ label: 'D\u00e9linquance (/10k)',   value: d.crime_r.toFixed(1) });
-
-    if (ecoRows.length) {
-      ecoRows.forEach(function(kv) {
-        var row = document.createElement('div');
-        row.className = 'detail-kv';
-        var lbl = document.createElement('span'); lbl.className = 'detail-kv-label'; lbl.textContent = kv.label;
-        var val = document.createElement('span'); val.className = 'detail-kv-value'; val.textContent = kv.value;
-        row.appendChild(lbl); row.appendChild(val);
-        ecoSec.appendChild(row);
-      });
-    } else {
-      var noData = document.createElement('div');
-      noData.style.cssText = 'font-size:11px;color:#555;font-style:italic;';
-      noData.textContent = 'Donn\u00e9es non disponibles';
-      ecoSec.appendChild(noData);
-    }
-    content.appendChild(ecoSec);
-
     // ── Date RDV (en bas) ──
     var rdvSec = document.createElement('div');
     rdvSec.className = 'detail-section';
@@ -1018,6 +876,7 @@ if (!st) {
   async function calcRoute(fromCode, toCode, toFeature) {
     var fromLatLng = getCentroid(fromCode);
     var toLatLng   = getCentroid(toCode);
+    console.log("[TRAJET]", fromCode, (hdf[fromCode]||{}).n, JSON.stringify(fromLatLng), "=>", toCode, (hdf[toCode]||{}).n, JSON.stringify(toLatLng));
     if (!fromLatLng || !toLatLng) { alert("Impossible de localiser une commune."); return; }
     routeText.textContent = '\u23f3 Calcul du trajet\u2026';
     routeBanner.style.display = 'flex';
@@ -1201,6 +1060,78 @@ if (!st) {
   }).addTo(map);
   communesGeo = null;
 
+  // Selecteur de date global (top-bar)
+  function initGlobalRdvDate() {
+    var input = document.getElementById('global-rdv-date');
+    var clearBtn = document.getElementById('global-rdv-clear');
+    var dateBtn = document.getElementById('global-rdv-btn');
+    if (!input) return;
+    if (dateBtn) dateBtn.addEventListener('click', function() {
+      if (typeof input.showPicker === 'function') { try { input.showPicker(); return; } catch(e) {} }
+      input.focus(); input.click();
+    });
+    input.addEventListener('change', function() {
+      if (input.value) {
+        highlightSameDay(input.value, null);
+        clearBtn.style.display = 'inline-block';
+      } else {
+        clearRdvHighlight();
+        clearBtn.style.display = 'none';
+      }
+    });
+    clearBtn.addEventListener('click', function() {
+      input.value = '';
+      clearRdvHighlight();
+      clearBtn.style.display = 'none';
+    });
+    // --- Menu deroulant des dates de RDV programmes ---
+    var listBtn = document.getElementById('global-rdv-list-btn');
+    var listMenu = document.getElementById('global-rdv-list-menu');
+    function frDate(iso) { var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+    function buildRdvMenu() {
+      listMenu.innerHTML = '';
+      var counts = {};
+      Object.keys(communeRdv).forEach(function(c) { var dt = communeRdv[c]; if (dt) counts[dt] = (counts[dt]||0)+1; });
+      var dates = Object.keys(counts).sort();
+      if (dates.length === 0) {
+        var empty = document.createElement('div');
+        empty.style.cssText = 'padding:12px;color:#9ca3af;font-size:13px;text-align:center;';
+        empty.textContent = 'Aucun RDV programme';
+        listMenu.appendChild(empty);
+        return;
+      }
+      dates.forEach(function(dt) {
+        var item = document.createElement('button');
+        item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:9px 12px;border:none;background:transparent;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;color:#374151;text-align:left;';
+        item.onmouseover = function() { item.style.background = '#f3e8ff'; };
+        item.onmouseout = function() { item.style.background = 'transparent'; };
+        item.innerHTML = '<span>\ud83d\udcc5 ' + frDate(dt) + '</span>'
+          + '<span style="background:#7e22ce;color:#fff;border-radius:10px;padding:2px 9px;font-size:12px;">' + counts[dt] + '</span>';
+        item.addEventListener('click', function() {
+          input.value = dt;
+          highlightSameDay(dt, null);
+          clearBtn.style.display = 'inline-block';
+          listMenu.style.display = 'none';
+        });
+        listMenu.appendChild(item);
+      });
+    }
+    listBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (listMenu.style.display === 'block') { listMenu.style.display = 'none'; return; }
+      buildRdvMenu();
+      listMenu.style.display = 'block';
+    });
+    document.addEventListener('click', function(e) {
+      if (listMenu.style.display !== 'block') return;
+      if (!listMenu.contains(e.target) && !listBtn.contains(e.target)) listMenu.style.display = 'none';
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGlobalRdvDate);
+  } else {
+    initGlobalRdvDate();
+  }
 
   // ─── Couche frontières départementales ───────────────────────────────────
   L.geoJSON(DEPT_BOUNDARIES, {
@@ -1364,8 +1295,7 @@ if (!st) {
     document.getElementById('detail-panel').classList.remove('open');
     document.getElementById('cmd-content').textContent = '';
     infoPanel.style.display = 'none';
-    if (mode === 'icp')               renderCmdICP();
-    else if (mode === 'politique')    renderCmdPolitique();
+    if (mode === 'politique')         renderCmdPolitique();
     else if (mode === 'prospection')  renderCmdProspection();
     else                              renderCmdConnectivite();
     geoLayer.setStyle(getStyle);
@@ -2263,16 +2193,7 @@ if (!st) {
     var el = document.getElementById('bottom-stats');
     if (!el) return;
     var total = Object.keys(hdf).length;
-    if (currentMode === 'icp') {
-      var cnt = 0, sum = 0;
-      for (var code in hdf) {
-        if (!passesICPFilters(code)) continue;
-        var sc = computeICPScore(code);
-        if (sc !== null) { sum += sc; cnt++; }
-      }
-      var avg = cnt > 0 ? (sum / cnt).toFixed(1) : '0';
-      el.textContent = total.toLocaleString('fr') + '\u00a0communes HDF \u00b7 Score moyen\u00a0: ' + avg + '/100 \u00b7 Hauts-de-France (02/59/60/62/80)';
-    } else if (currentMode === 'politique') {
+    if (currentMode === 'politique') {
       var withNuance = 0;
       for (var code in hdf) { if (hdf[code].f !== 'Non class\u00e9') withNuance++; }
       el.textContent = total.toLocaleString('fr') + '\u00a0communes \u00b7 ' + withNuance.toLocaleString('fr') + ' avec nuance politique';
