@@ -178,7 +178,7 @@ window._syncFirebase = function() {
       </div>
       <button id="global-rdv-clear" style="padding:9px 14px;border:1px solid rgba(0,0,0,0.15);border-radius:9px;background:#fff;font-size:14px;font-weight:700;cursor:pointer;color:#9ca3af;display:none;">✕</button>
     </div>
-    <button id="toggle-grandes-btn" onclick="window.toggleGrandesVilles()" style="padding:6px 12px;border:1px solid rgba(0,0,0,0.15);border-radius:8px;background:#fff;cursor:pointer;font-size:12px;margin-right:6px;">🏙️ Masquer grandes villes</button>
+    <button id="toggle-horscible-btn" onclick="window.toggleHorsCible()" style="padding:6px 12px;border:1px solid rgba(0,0,0,0.15);border-radius:8px;background:#fff;cursor:pointer;font-size:12px;margin-right:6px;">👁️ Afficher hors-cible</button>
     <button onclick="window._syncFirebase()" style="padding:6px 12px;border:1px solid rgba(0,0,0,0.15);border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:#374151;margin-left:8px;">⟳ Sync</button>
     <span id="region-label">Hauts-de-France &middot; 02 / 59 / 60 / 62 / 80</span>
   </div>
@@ -803,7 +803,7 @@ if (!st) {
   });
 
   // ─── Couche de fond : communes HDF hors périmètre (> 7000 hab ou données absentes) ──
-  L.geoJSON(HDF_BG_GEO, {
+  var bgLayer = L.geoJSON(HDF_BG_GEO, {
     style: function() {
       return { fillColor: '#d0d0d0', fillOpacity: 0.5,
                weight: 0.3, color: '#b8b8b8', opacity: 0.5,
@@ -857,25 +857,33 @@ if (!st) {
     }
   }
 
-  window.toggleGrandesVilles = function() {
-    grandesVillesVisible = !grandesVillesVisible;
-    var btn = document.getElementById('toggle-grandes-btn');
-    if (grandesVillesVisible) {
+  // Toggle unique : masque/affiche TOUTES les communes hors-cible
+  // (fond gris + grandes villes >=7000 + petites communes <200), en 1 clic.
+  var horsCibleVisible = true;
+  window.toggleHorsCible = function() {
+    horsCibleVisible = !horsCibleVisible;
+    var btn = document.getElementById('toggle-horscible-btn');
+    if (horsCibleVisible) {
+      bgLayer.addTo(map);
       grandesVillesLayer.addTo(map);
       grandesVillesLabels.forEach(function(l) { l.addTo(map); });
-      if (btn) btn.innerHTML = '🏙️ Masquer grandes villes';
+      if (petitesCommunesLayer) petitesCommunesLayer.addTo(map);
+      if (btn) btn.innerHTML = '🙈 Masquer hors-cible';
     } else {
+      map.removeLayer(bgLayer);
       map.removeLayer(grandesVillesLayer);
       grandesVillesLabels.forEach(function(l) { map.removeLayer(l); });
-      if (btn) btn.innerHTML = '🏙️ Afficher grandes villes';
+      if (petitesCommunesLayer) map.removeLayer(petitesCommunesLayer);
+      if (btn) btn.innerHTML = '👁️ Afficher hors-cible';
     }
   };
 
   buildGrandesVilles();
 
   // ─── PETITES COMMUNES (<200 hab, hors cible) ────────────
+  var petitesCommunesLayer = null;
   function buildPetitesCommunes() {
-    L.geoJSON(PETITES_COMMUNES_GEO, {
+    petitesCommunesLayer = L.geoJSON(PETITES_COMMUNES_GEO, {
       style: function() {
         return { fillColor: '#b5b5b5', fillOpacity: 0.6,
                  weight: 0.4, color: '#9a9a9a', opacity: 0.6,
@@ -895,6 +903,9 @@ if (!st) {
   }
 
   buildPetitesCommunes();
+
+  // Par défaut : communes hors-cible masquées (clarté visuelle). Le bouton les réaffiche.
+  window.toggleHorsCible();
 
   // ─── GeoJSON layer ────────────────────────────────────────────────────────────
   var layerByCode = {};
