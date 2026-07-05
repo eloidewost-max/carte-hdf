@@ -1,145 +1,153 @@
-# CLAUDE.md
+# CLAUDE.md — Carte de prospection Vizzia (Hauts-de-France)
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> Fichier de contexte lu automatiquement par Claude Code au démarrage de chaque session.
+> Il décrit le projet, les règles de travail, la structure des données et la feuille de route.
 
-## Project Overview
+---
 
-Interactive map visualizing French municipal mayors' political affiliations, local surveillance data, crime statistics, and socio-economic indicators across ~35,000 communes. Five modes: **prospection** (composite score for video-enforcement potential, default), **politique** (political family colors), **surveillance** (heatmap of police agents per capita), **securite** (crime rate heatmap by category), and **municipales2026** (upcoming municipal election data with party glow effects).
+## Qui je suis (l'utilisateur)
 
-## Architecture
+Je m'appelle Eloi, commercial terrain chez Vizzia. **Je ne suis PAS développeur.** Je comprends la logique mais pas le code. Il faut donc :
+- M'expliquer les choses simplement, sans jargon.
+- Bien distinguer quand tu parles du TERMINAL vs d'autre chose.
+- Y aller étape par étape, en prévenant tout risque de perte de données.
+- Toujours tester avant de déployer, et faire des sauvegardes.
 
-**Single-file frontend** — all HTML, CSS, and JavaScript live in `index.html` (~3400 lines). No build system, no framework beyond Leaflet. Deployed on **Vercel** with **Clerk** authentication (Edge Middleware + jose JWT verification). Only `@vizzia.fr` email addresses can access the app.
+Mon équipe : **Étienne** (BDR/associé, travaille avec moi sur les Hauts-de-France) et **Sami** (nouveau, s'occupera de la région Auvergne-Rhône-Alpes).
 
-### Frontend Stack
-- **Leaflet.js** (v1.9.4) for map rendering, loaded from CDN with SRI hash
-- **topojson-client** (v3.1.0) for converting TopoJSON → GeoJSON, loaded from CDN with SRI hash
-- **Clerk JS** for client-side session management (sign-in/sign-out), loaded from Clerk's CDN
-- **CartoDB Dark No Labels** basemap
-- Vanilla JavaScript (ES5-compatible), inline CSS
+---
 
-### Authentication & Hosting
-- **Vercel** — static site hosting with Edge Middleware
-- **Clerk** — authentication provider, restricts access to `@vizzia.fr` emails
-- **`middleware.js`** — Vercel Edge Middleware using `jose` for JWT verification against Clerk's JWKS; checks email domain via Clerk REST API (cached per user)
-- **`sign-in.html`** — login page with Clerk's `mountSignIn` component (dark theme matching the app)
-- **`vercel.json`** — framework: null, rewrite `/sign-in` → `/sign-in.html`
-- **Environment variables** (set in Vercel dashboard): `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
+## Le projet en bref
 
-### Data Pipeline
-Python scripts generate JSON data files from external sources (data.gouv.fr, INSEE, ONISR, DGFiP):
+Une **carte web de prospection commerciale** pour cibler et suivre les communes des Hauts-de-France (départements 02, 59, 60, 62, 80).
 
+- **Fichier unique** : `hdf-map.html` (~3,3 Mo), tout est dedans (HTML + CSS + JS + données).
+- **Techno** : Leaflet.js (carte) + Firebase Firestore (données temps réel via onSnapshot).
+- **Hébergement** : GitHub Pages. Dépôt `eloidewost-max/carte-hdf`, remote `carte-hdf`, branche locale `feature/carte-v2` poussée sur `main`.
+- **URL publique** : https://eloidewost-max.github.io/carte-hdf/
+- **Chemin local** : `/Users/eloi/Desktop/Artefact Vizzia/carte-politique-main/` (⚠️ contient un espace).
+
+---
+
+## Workflow de déploiement (IMPORTANT)
+
+Règle d'or : **tester le JS AVANT de déployer.** Ne jamais déployer un fichier dont le JavaScript n'a pas été validé.
+
+Procédure sûre pour toute modification :
+1. Faire une sauvegarde du fichier avant modif : `cp hdf-map.html hdf-map-AVANT-[nom].html`
+2. Modifier `hdf-map.html`.
+3. Valider le JS : extraire le script et faire `node --check`. Si erreur → NE PAS déployer, corriger d'abord.
+4. Tester en local : `open "hdf-map.html"` et vérifier le comportement.
+5. Déployer avec l'alias `deploycarte`.
+
+L'alias `deploycarte` fait :
 ```
-process_maires.py       → maires.json        (mayors + political family, ~3.8 MB)
-process_surveillance.py → surveillance.json  (police counts + ratio, ~183 KB)
-process_prospection.py  → prospection.json   (prospection signals + scoring data, ~1.3 MB)
-process_delinquance.py  → delinquance.json   (crime stats by commune, ~1.2 MB)
-process_enrichment.py   → enrichment.json    (QPV, DGFiP finances, revenus, ~3.2 MB)
-process_insights.py     → insights.json      (peer groups, benchmarks, narrative flags, ~5 MB)
-```
-
-```
-process_municipales2026.py  → municipales2026.json (municipal election data, ~8.5 MB)
-```
-
-Python dependencies: `pandas`, `openpyxl`, `odf`, `pyarrow` (for parquet)
-
-Node dependencies (for Vercel middleware): `jose` (JWT verification, Edge-compatible)
-
-### Key Data Files
-- `communes-topo.json` — TopoJSON commune boundaries (13 MB, object key: `a_com2022`)
-- `maires.json` — keyed by INSEE code, fields: `n` (name), `nu` (nuance), `f` (famille), `cl` (color), `lb` (label), `m` (maire)
-- `surveillance.json` — keyed by INSEE code, fields: `pm` (police municipale), `asvp` (ASVP agents), `pop` (population), `r` (ratio per 10k, capped at 50), `r_raw` (uncapped ratio, only if capped)
-- `prospection.json` — keyed by INSEE code, fields: `stat_payant`, `videoverb`, `pm`, `asvp`, `pop`, `pm_trend` (array), `pm_trend_years` (array), `accidents` (count 2023-2024), `accidents_years`
-- `delinquance.json` — keyed by INSEE code, fields: `total` (total crimes), `cats` (object with 15 short keys), `pop` (population), `r` (ratio per 10k), `year`
-- `enrichment.json` — keyed by INSEE code, fields: `qpv` (QPV count), `dgf_hab` (DGF per capita), `dette_hab`, `cafn_hab`, `perso_hab`, `rev_med` (median income), `tx_pauv` (poverty rate)
-- `insights.json` — keyed by INSEE code, fields: `peers` (top 5 peer codes), `peer_names` (display names), `bench` (benchmarks: `crime_r`, `pm_r`, `accidents_r`, `rev_med`, `tx_pauv` each with `val`/`med`/`pct`), `flags` (narrative booleans + numeric: `crime_above_peers`, `no_pm_peers_have`, `no_vv_peers_have`, `pm_growing`, `high_accident_rate`, `budget_capacity`, `high_poverty`, `peers_pm_pct`, `peers_vv_pct`, `peers_stat_payant_pct`)
-
-### Crime Categories (delinquance.json `cats` keys)
-`cambr` (cambriolages), `destr` (destructions), `escro` (escroqueries), `traf_stup` (trafic stupefiants), `usage_stup`, `usage_stup_afd`, `viol_phys` (violences physiques), `viol_intraf` (violences intrafamiliales), `viol_sex` (violences sexuelles), `vols_armes`, `vols_acc_veh`, `vols_ds_veh`, `vols_veh`, `vols_sv` (vols sans violence), `vols_viol`
-
-### Prospection Scoring
-Composite score from 6 weighted signals (no_videoverb moved to filter-only):
-- `stat_payant` (30%) — commune has paid parking (GART 2019)
-- `pm_count` (20%) — police agents per 10k pop, capped at 1
-- `pm_growth` (10%) — growth rate weighted by sqrt(volume) to avoid small-number noise
-- `accidents` (15%) — road accidents per 10k pop (ONISR 2023-2024)
-- `pop_sweet` (25%) — gaussian on log(pop) centered at 30k
-- `budget_capacity` (0% default) — DGF per capita normalized (DGFiP 2022), user-activatable
-
-### Performance Patterns
-- **Pre-allocated style constants** — 6 shared `STYLE_*` objects reused across 35k features per restyle (Leaflet copies properties, never mutates source)
-- **`dashArray: null`** on all non-dashed styles — prevents Leaflet `setStyle` merge leak when switching from dashed modes (surveillance/securite) to non-dashed (politique/prospection)
-- **Score caching** — `prospScoreCache` avoids recomputing 35k scores; invalidated on weight/filter change
-- **Debounced sliders** — all range inputs use 50ms `setTimeout` to avoid 60Hz restyles during drag
-- **Debounced search** — 80ms debounce on search input to avoid 35k linear scans at keystroke rate
-- **Search normalization** — `nameNorm` pre-computed at index build time (NFD + diacritics strip + lowercase) instead of per keystroke
-- **Memory management** — `topoData = null` after TopoJSON→GeoJSON conversion, `communesGeo = null` after layer creation
-
-### State Management
-Global JS variables: `currentMode` ('prospection'|'politique'|'surveillance'|'securite'|'municipales2026', default: `'prospection'`), `activeFilter` (selected political family), `survFilters` (ratio slider + checkbox), `prospWeights` (signal weights for scoring), `prospFilters` (prospection mode filters including `qpvOnly`), `secuFilter` (selected crime category or null), `secuFilters` (ratioMin slider + dataOnly checkbox), `delinq` (delinquance data object), `enrich` (enrichment data object), `insights` (peer groups + benchmarks + narrative flags), `mun2026` (municipales 2026 data object).
-
-### Deep Linking
-URL parameters: `?mode=X&commune=XXXXX&filter=Y`. State encoded via `history.pushState` (commune changes) and `history.replaceState` (mode/filter changes). Restored on page load after data and layers are initialized. Default mode (prospection) omitted from URL for clean links.
-
-### Core Flow
-1. Fetch 8 JSON data files on load (maires, surveillance, prospection, delinquance, enrichment, insights, municipales2026)
-2. Convert TopoJSON → GeoJSON via `topojson.feature()`, then free source objects
-3. Style communes via `getStylePolitique()`, `getStyleSurveillance()`, `getStyleSecurite()`, or `getStyleProspection()` based on mode; all return `dashArray: null` (or `'2 4'` for dashed) to prevent style leaks
-4. Hover shows info panel (`#info`), click zooms + opens detail panel (`#detail-panel.open`)
-5. Search bar with autocomplete indexes commune names from all data sources, uses `layerByCode` lookup to zoom to selected commune
-6. Detail panel shows all available data for a commune regardless of active mode (delinquance breakdown, finances, QPV badge, freshness badges)
-7. **Argumentaire section** in detail panel: auto-generated sales narrative from peer-group benchmarks, comparison table, clickable peer commune links
-8. **Deep linking** via URL parameters: `?mode=X&commune=XXXXX&filter=Y` — state restored on page load
-9. Methodology drawer (`#methodo-drawer`) documents sources, freshness, and known biases
-
-### Mode Colors
-| Mode | Color | Palette |
-|------|-------|---------|
-| Prospection | `#4ecdc4` | Blue → red (5 levels) |
-| Politique | `#4a90d9` | Political family colors |
-| Surveillance | `#e8913a` | Yellow → red (6 levels) |
-| Securite | `#c0392b` | Violet → magenta (6 levels, `SECU_COLORS`) |
-| Municipales 2026 | `#f1c40f` | Party-specific colors with CSS glow effects |
-
-### UI Layout
-- **`#top-bar`** — search box, mode tab buttons (`.mode-btn[data-mode]`), methodology button, user email + sign-out button
-- **`#cmd-panel > #cmd-content`** — left sidebar, dynamically rebuilt on mode switch (`renderCmdPolitique`, `renderCmdSurveillance`, `renderCmdSecurite`, `renderCmdProspection`, `renderCmdMunicipales2026`)
-- **`#map`** — Leaflet container
-- **`#bottom-bar > #bottom-stats`** — contextual stats per mode
-- **`#detail-panel`** — slide-in right panel (`.open` class), commune-level deep dive
-- **`#info`** — floating tooltip on hover
-- **`#methodo-overlay` + `#methodo-drawer`** — methodology slide-in drawer
-
-## Commands
-
-### Regenerate data files
-```bash
-python3 process_maires.py           # requires nuances-communes.csv + elus-maires.csv in /tmp
-python3 process_surveillance.py     # downloads from data.gouv.fr APIs
-python3 process_prospection.py      # builds prospection scoring data
-python3 process_delinquance.py      # downloads parquet from data.gouv.fr (~14 MB)
-python3 process_enrichment.py       # downloads QPV CSV, DGFiP JSON, Filosofi 2021 CSV
-python3 process_insights.py        # computes peer groups + benchmarks from other JSONs (~2 min)
+cd "/Users/eloi/Desktop/Artefact Vizzia/carte-politique-main" && cp hdf-map.html index.html && git add . && git commit -m "update carte" && git push carte-hdf HEAD:main --force
 ```
 
-### Development
-Open `index.html` directly in a browser — no dev server needed. Auth is bypassed locally (Clerk JS fails gracefully, middleware only runs on Vercel).
+Notes de déploiement :
+- GitHub Pages échoue parfois temporairement ("try again later") → relancer avec `git commit --allow-empty -m "relance" && git push carte-hdf HEAD:main --force`.
+- Recharger la carte en ligne avec Cmd+Shift+R.
+- L'aperçu HTML dans le chat Claude affiche des erreurs "firebase/L is not defined" → NORMAL (l'aperçu bloque les libs externes), ça ne teste pas la validité réelle. Toujours tester en local.
 
-### Deployment
-Deployed on **Vercel** with automatic deploys from `main` branch on GitHub (`memfice/carte-politique`).
-1. Push to `main` → Vercel auto-deploys
-2. Environment variables (`CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`) are set in Vercel dashboard
-3. Clerk publishable key is also embedded in `sign-in.html` and `index.html` (publishable keys are public by design)
+---
 
-## Conventions
+## Filet de sécurité en place
 
-- **Commits:** `type: message` format (feat, fix, style, docs, chore)
-- **JS naming:** camelCase variables, kebab-case DOM IDs and CSS classes
-- **Data keys:** short abbreviations to minimize JSON size (see data files section above)
-- **Language:** UI text is in French
-- **Style returns:** every `getStyle*()` function and `STYLE_*` constant must include `dashArray` (either `null` or a dash pattern) to prevent Leaflet merge leaks
-- **CDN scripts:** must have `integrity` (SRI) and `crossorigin="anonymous"` attributes (except Clerk JS which is loaded from Clerk's own domain)
-- **Slider handlers:** must debounce expensive operations (restyle, list rebuild) at 50ms minimum
-- **Leaflet gotcha:** `setStyle()` merges properties (doesn't replace); use `resetStyle()` or explicit nulls to clear stale properties
-- **Clerk JS CDN:** must load from `improved-stag-29.clerk.accounts.dev/npm/@clerk/clerk-js@latest/...` (not jsdelivr) — the Clerk-hosted bundle includes UI components (SignIn, UserButton), the npm bundle is headless-only
-- **Middleware:** uses `jose` (not `@clerk/backend`) for JWT verification — `@clerk/backend` imports Node.js `crypto` which is incompatible with Vercel Edge Runtime
+- Tag Git `v1-stable` = point de retour du code (avant la refonte).
+- Sauvegarde JSON des données (statuts + visites + rdv) exportable via le bouton "💾 Sauvegarder une copie" dans l'app.
+- Nombreux fichiers `.bak` d'anciennes versions (ménage possible, pas urgent).
+
+---
+
+## Structure des données
+
+### `HDF_DATA` — les communes cliquables (~2760)
+Objet `{ "codeINSEE": { n, lat, lng, pop, ... } }`. Ex :
+`"80021": { "n": "Amiens", "lat": 49.8942, "lng": 2.2958, "pop": 134057, ... }`
+Le code INSEE (clé) est central : 2 premiers chiffres = département.
+
+### `COMMUNES_GEO` — géométries cliquables
+GeoJSON, properties `{ "codgeo": "02001" }`.
+
+### `HDF_BG_GEO` — couche de fond (1034 communes)
+Contours gris, properties `{ codgeo }`. Contenait à l'origine les communes hors cible : les **<200 hab** (880, mises de côté car trop petites) et les **≥7000 hab** (147 grandes villes).
+
+### `GRANDES_VILLES_GEO` / `GRANDES_VILLES_DATA`
+Les 147 grandes villes (≥7000 hab), rendues cliquables : grises foncées, popup nom+population, noms affichés, bouton toggle pour masquer/afficher.
+
+### Les 8 statuts commerciaux (couleurs)
+- perdu `#ef4444` · perdu_rdv `#7f1d1d` · prospectee `#6b7280` · rdv_avenir `#93c5fd` · rdv_fait `#1d4ed8` · signature `#f97316` · signe `#22c55e` · prioritaire `#eab308`
+- Statut "prospectée" peu utilisé, sera probablement supprimé.
+
+### Firebase
+projectId "communes-hdf". Documents : `statuts/communes`, `statuts/visites`, `statuts/rdv`.
+
+---
+
+## Comportements clés déjà en place
+
+- **Clic simple** sur commune → ouvre le détail, NE bouge PAS la carte.
+- **SHIFT + clic** → recentre (zoom doux, maxZoom 10).
+- **CMD + clic** → trajet (multitrajets, lignes pointillées, temps/distance OSRM).
+- **Recherche** (barre) → logique par DÉPARTEMENT : même département que la recherche précédente → la commune clignote (contours jaunes) sans bouger la carte ; département différent → recentrage zoom léger (maxZoom 10.5).
+- Filtre département (pastilles 02/59/60/62/80).
+- Filtre population : existe dans le code mais plus accessible via l'UI (à ré-exposer un jour) — sert à cibler des tailles de communes pour les exports.
+- Sélecteur de date pour les rdv + surbrillance même jour.
+
+---
+
+## Feuille de route (chantiers restants, ordre logique)
+
+1. **Petites communes (<200 hab, 880)** : les rendre cliquables pour voir détail/population, SANS statut. Contours dans HDF_BG_GEO, données nom+pop déjà récupérées (fichier `communes-plus7000.json`).
+2. **Surcouches thématiques** : filtres à pastilles cumulables, open data (éoliennes d'abord, puis 5G…). Ajouter un critère = ajouter une donnée, pas recoder.
+3. **Pont HubSpot → carte** (gros morceau, carburant du reste) : faire remonter les rdv HubSpot automatiquement. Voir cadrage détaillé.
+4. **Vue Agenda** : remplacer les onglets inutiles (Politique, Connectivité, ex-ICP) par Prospection + Agenda. Sélection d'une plage de dates → affiche les communes avec rdv sur la période (physiques en couleur vive, visios en clair, communes actives à potentiel en gris uni sauf perdus). Débouché du pont HubSpot.
+5. **Duplication Auvergne-Rhône-Alpes** : 03 Allier, 63 Puy-de-Dôme, 15 Cantal, 43 Haute-Loire, 07 Ardèche. Carte séparée + base Firebase propre.
+
+---
+
+## Pont HubSpot — points clés (chantier majeur)
+
+Objectif : les rdv saisis dans HubSpot remontent automatiquement sur la carte (fini la double saisie). HubSpot = source de vérité, la carte lit.
+
+Validé techniquement :
+- Fiches commune HubSpot (objet Company) ont le champ `code_commune_insee` = même clé que la carte.
+- Rdv = objets Meeting avec `hs_meeting_start_time` (date), `hs_meeting_outcome` (SCHEDULED/COMPLETED/CANCELED/NO_SHOW), `hubspot_owner_id` (le propriétaire, permet de filtrer par personne).
+- Chaîne Meeting → Company → code_commune_insee fiable.
+
+**Physique vs visio** : le champ **Location** du meeting (`hs_meeting_location_type`) fait foi :
+- `ADDRESS` (In-person) = physique → crée une visite terrain.
+- `VCE` (Google Meet / Teams) = visio → PAS de visite terrain.
+- Plus fiable que le titre. Dépend du remplissage rigoureux du champ (discipline de saisie à imposer à l'équipe).
+
+Points à trancher avant de coder (règles déterministes obligatoires, sinon risque que toutes les communes changent de couleur d'un coup) :
+- **Machine à états des statuts** : Prioritaire → (rdv physique pris) → Rdv à venir ; Rdv à venir → (décalé) → Rdv à venir (nouvelle date) ; Rdv à venir → (annulé/sans suite) → retour Prioritaire ; Rdv à venir → (fait) → Rdv fait ; Rdv fait → (signature) → Signé. Définir la hiérarchie de priorité entre statuts.
+- **Cas multi-rdv** : une commune vue plusieurs fois peut être "Rdv fait" ET avoir un nouveau "Rdv à venir". Ne pas perdre l'historique. Piste : couleur simple + détail riche au clic (historique HubSpot) + éventuel badge "déjà visitée".
+- **Import ponctuel vs synchro vivante** ; gestion annulations/décalages ; quels rdv (les miens ? HDF only ? à venir only ?) ; meetings sans commune associée.
+- **Protocole de saisie BDR** : la carte n'est fiable que si Étienne, Sami et moi remplissons bien les champs HubSpot (Location, outcome). Fiche de consignes à créer.
+
+Note technique : `query_crm_data` (SQL HubSpot) échoue faute de scope `reporting-base-read` ; utiliser `search_crm_objects`.
+
+---
+
+## Dimension équipe (à anticiper dans l'architecture)
+
+- Cartes de prospection séparées par territoire (HDF / ARA), bases Firebase distinctes.
+- MAIS besoin d'une vue Agenda partagée (au moins déplacements physiques) pour éviter les conflits : ex. que Sami ne cale pas un rdv physique à Clermont le jour où je suis en déplacement dans l'Oise. Faisable via `hubspot_owner_id` (filtrer/colorer par personne).
+
+---
+
+## Décisions de conception actées
+
+- Garder séparés : **statuts carte** (ressenti terrain manuel, précieux) et **stages deals HubSpot** (avancement officiel). Complémentaires.
+- **Ne pas afficher les deals** sur la carte de prospection (besoin non avéré).
+- Le pont HubSpot concerne **les rdv**, pas les deals.
+- Chaque vue a son propre langage de couleurs (ne pas surcharger).
+
+---
+
+## Rappels pratiques
+
+- Vider régulièrement le dossier Téléchargements des vieux `hdf-map*.html` (Chrome crée des `_1`, `_2`… qui ont déjà causé le déploiement d'une mauvaise version).
+- Révoquer les anciens tokens GitHub qui ont fuité dans d'anciennes sessions.
