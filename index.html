@@ -131,11 +131,23 @@ var firebaseConfig = { apiKey: "AIzaSyDDPmIB9GmjhQJZEoMIngbXrHPyCqPDEiM", authDo
 firebase.initializeApp(firebaseConfig);
 var db = firebase.firestore();
 window.saveToFirebase = async function(statuts) { await db.collection("statuts").doc("communes").set(statuts); };
+// Simplification 8 -> 6 statuts : 'perdu_rdv' -> 'perdu' (fusion), 'prospectee' -> retiré (commune neutre).
+// Retourne { data: annuaire nettoyé, changed: true si au moins une valeur a été modifiée/retirée }.
+window.normalizeStatuts = function(raw) {
+  var out = {}, changed = false;
+  for (var code in raw) {
+    var v = raw[code];
+    if (v === 'prospectee') { changed = true; continue; }
+    if (v === 'perdu_rdv')  { out[code] = 'perdu'; changed = true; continue; }
+    out[code] = v;
+  }
+  return { data: out, changed: changed };
+};
 window._syncFirebase = function() {
   db.collection("statuts").doc("rdv").get().then(function(d) { if (d.exists) communeRdv = d.data(); });
   db.collection("statuts").doc("communes").get().then(function(docSnap) {
     if (docSnap.exists) {
-      communeStatuts = docSnap.data();
+      communeStatuts = window.normalizeStatuts(docSnap.data()).data;
       if (typeof geoLayer !== "undefined") geoLayer.setStyle(getStyle);
       if (typeof refreshStatusLabels === "function") refreshStatusLabels();
       if (currentMode === "prospection") {
@@ -287,9 +299,7 @@ var PETITES_COMMUNES_GEO = {"type":"FeatureCollection","features":[{"type":"Feat
 
   // ─── Statuts commerciaux ──────────────────────────────────────────────────────
  var STATUTS = [
-  { key: 'perdu',          label: 'Deal perdu',           color: '#ef4444' },
-  { key: 'perdu_rdv',      label: 'Deal perdu (après rdv)',color: '#7f1d1d' },
-  { key: 'prospectee',     label: 'Prospectée',            color: '#6b7280' },
+  { key: 'perdu',          label: 'Perdu',                color: '#ef4444' },
   { key: 'rdv_avenir',     label: 'Rdv à venir',           color: '#93c5fd' },
   { key: 'rdv_fait',       label: 'Rdv fait',              color: '#1d4ed8' },
   { key: 'signature',      label: 'En cours de signature', color: '#f97316' },
@@ -329,7 +339,13 @@ var PETITES_COMMUNES_GEO = {"type":"FeatureCollection","features":[{"type":"Feat
 
   db.collection("statuts").doc("communes").onSnapshot(function(docSnap) {
   if (docSnap.exists) {
-    communeStatuts = docSnap.data();
+    var _norm = window.normalizeStatuts(docSnap.data());
+    communeStatuts = _norm.data;
+    // Nettoyage unique de Firebase (fusion perdu_rdv->perdu, retrait prospectee). Une seule écriture, pas de boucle.
+    if (_norm.changed && !window.__statutsMigrated) {
+      window.__statutsMigrated = true;
+      if (window.saveToFirebase) window.saveToFirebase(communeStatuts);
+    }
     if (typeof geoLayer !== "undefined") geoLayer.setStyle(getStyle);
  if (typeof refreshStatusLabels === "function" && typeof statusLabelLayer !== "undefined") refreshStatusLabels();
     if (typeof renderCmdProspection === "function" && currentMode === "prospection") {
