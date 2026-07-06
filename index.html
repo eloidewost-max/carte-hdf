@@ -837,11 +837,12 @@ if (!st) {
   var grandesVillesVisible = true;
 
   function buildGrandesVilles() {
-    // Couche des contours : gris fonce, cliquable
+    // Couche des contours : meme gris que les petites communes (hors-scope uniforme), cliquable.
+    // Pas de noms affiches : le nom apparait au clic (popup), comme pour toutes les autres communes.
     grandesVillesLayer = L.geoJSON(GRANDES_VILLES_GEO, {
       style: function() {
-        return { fillColor: '#8a8a8a', fillOpacity: 0.7,
-                 weight: 0.5, color: '#6a6a6a', opacity: 0.8,
+        return { fillColor: '#b5b5b5', fillOpacity: 0.6,
+                 weight: 0.4, color: '#9a9a9a', opacity: 0.6,
                  interactive: true, dashArray: null };
       },
       onEachFeature: function(feature, layer) {
@@ -851,26 +852,10 @@ if (!st) {
           + 'Population : ' + (p.pop ? p.pop.toLocaleString('fr') : '?') + ' hab.<br>'
           + '<span style="color:#888;font-size:11px;">Hors cible (+7000 hab)</span></div>';
         layer.bindPopup(popContent);
-        layer.on('mouseover', function() { this.setStyle({ fillOpacity: 0.85, weight: 1.5 }); });
-        layer.on('mouseout', function() { this.setStyle({ fillOpacity: 0.7, weight: 0.5 }); });
+        layer.on('mouseover', function() { this.setStyle({ fillOpacity: 0.8, weight: 1.2 }); });
+        layer.on('mouseout', function() { this.setStyle({ fillOpacity: 0.6, weight: 0.4 }); });
       }
     }).addTo(map);
-
-    // Labels (noms) en noir, petit
-    for (var code in GRANDES_VILLES_DATA) {
-      var v = GRANDES_VILLES_DATA[code];
-      if (v.lat && v.lng) {
-        var lbl = L.marker([v.lat, v.lng], {
-          interactive: false,
-          icon: L.divIcon({
-            className: 'grande-ville-label',
-            html: '<span style="font-size:10px;color:#111;font-weight:600;white-space:nowrap;text-shadow:0 0 2px #fff,0 0 2px #fff,0 0 2px #fff;">' + v.n + '</span>',
-            iconSize: [0,0]
-          })
-        }).addTo(map);
-        grandesVillesLabels.push(lbl);
-      }
-    }
   }
 
   // Toggle unique : masque/affiche TOUTES les communes hors-cible
@@ -1219,28 +1204,8 @@ if (!st) {
     L.marker([d.lat, d.lng], { icon: icon, interactive: false, keyboard: false }).addTo(map);
   });
 
-  // ─── Labels grandes villes (repères visuels) ──────────────────────────────
-  var CITY_LABELS = [
-    { name: 'Lille',    lat: 50.6292, lng: 3.0573 }
-  ];
-
-  var SHADOW = 'text-shadow:0 1px 3px rgba(255,255,255,0.95),0 0 8px rgba(255,255,255,0.8);';
-
-  CITY_LABELS.forEach(function(c) {
-    var icon = L.divIcon({
-      className: '',
-      html: '<div style="text-align:center;pointer-events:none;line-height:1.3;white-space:nowrap;">'
-          + '<div style="display:inline-block;width:7px;height:7px;border-radius:50%;'
-          +   'background:#374151;vertical-align:middle;margin-right:5px;'
-          +   'box-shadow:0 0 3px rgba(255,255,255,0.8);"></div>'
-          + '<span style="font-size:13px;font-weight:700;color:#374151;vertical-align:middle;' + SHADOW + '">'
-          + c.name + '</span>'
-          + '</div>',
-      iconSize:   [120, 20],
-      iconAnchor: [60, 10]
-    });
-    L.marker([c.lat, c.lng], { icon: icon, interactive: false, keyboard: false }).addTo(map);
-  });
+  // (Ancien repère visuel "Lille" retiré : les communes hors-scope n'affichent plus de nom permanent,
+  //  le nom apparaît au clic comme pour toutes les autres communes.)
 
   // ─── Labels statuts commerciaux ───────────────────────────────────────────────
   var statusLabelLayer = L.layerGroup().addTo(map);

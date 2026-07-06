@@ -36,7 +36,7 @@ Règle d'or : **tester le JS AVANT de déployer.** Ne jamais déployer un fichie
 Procédure sûre pour toute modification :
 1. Faire une sauvegarde du fichier avant modif : `cp hdf-map.html hdf-map-AVANT-[nom].html`
 2. Modifier `hdf-map.html`.
-3. Valider le JS : extraire le script et faire `node --check`. Si erreur → NE PAS déployer, corriger d'abord.
+3. Valider le JS avant de déployer. Si erreur → NE PAS déployer, corriger d'abord. ⚠️ `node` n'est PAS installé sur cette machine : utiliser JavaScriptCore (`jsc`, fourni avec macOS : `/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc`). Extraire le JS des `<script>`, l'entourer de `if(false){ ... }` (analyse syntaxique sans exécution → pas d'erreur parasite type "L is not defined"), puis `jsc fichier.js` (sortie vide = OK). Valider aussi les gros blocs de données injectés avec `python3 -c "import json; json.loads(...)"`.
 4. Tester en local : `open "hdf-map.html"` et vérifier le comportement.
 5. Déployer avec l'alias `deploycarte`.
 
@@ -71,14 +71,21 @@ Le code INSEE (clé) est central : 2 premiers chiffres = département.
 GeoJSON, properties `{ "codgeo": "02001" }`.
 
 ### `HDF_BG_GEO` — couche de fond (1034 communes)
-Contours gris, properties `{ codgeo }`. Contenait à l'origine les communes hors cible : les **<200 hab** (880, mises de côté car trop petites) et les **≥7000 hab** (147 grandes villes).
+Contours gris clair `#d0d0d0`, properties `{ codgeo }`. Communes hors cible : les **<200 hab** (880) et les **≥7000 hab** (147 grandes villes) + 7 codes résiduels.
 
 ### `GRANDES_VILLES_GEO` / `GRANDES_VILLES_DATA`
-Les 147 grandes villes (≥7000 hab), rendues cliquables : grises foncées, popup nom+population, noms affichés, bouton toggle pour masquer/afficher.
+Les 147 grandes villes (≥7000 hab), rendues cliquables : gris foncé `#8a8a8a`, popup nom+population, noms affichés.
 
-### Les 8 statuts commerciaux (couleurs)
-- perdu `#ef4444` · perdu_rdv `#7f1d1d` · prospectee `#6b7280` · rdv_avenir `#93c5fd` · rdv_fait `#1d4ed8` · signature `#f97316` · signe `#22c55e` · prioritaire `#eab308`
-- Statut "prospectée" peu utilisé, sera probablement supprimé.
+### `PETITES_COMMUNES_GEO` / `PETITES_COMMUNES_DATA` (fait le 2026-07-05)
+Les 880 petites communes (<200 hab), rendues cliquables : gris moyen `#b5b5b5`, popup nom+population, SANS statut ni lien Firebase (calque isolé). 7 codes INSEE fusionnés/introuvables restent en fond inerte (62743, 80830, 02311, 62461, 02077, 62549, 59070). Données nom+pop récupérées via l'API `geo.api.gouv.fr` (le fichier `communes-plus7000.json` mentionné avant n'existait plus).
+
+### Toggle "hors-cible" (bouton unique, fait le 2026-07-05)
+Un seul bouton (`toggleHorsCible`) masque/affiche d'un coup TOUT le hors-cible : fond gris + grandes villes (+ leurs noms) + petites communes. **Masqué par défaut** au chargement (carte épurée = seulement les communes cibles 200–7000 hab). Remplace l'ancien bouton "grandes villes".
+
+### Les 6 statuts commerciaux (couleurs)
+- prioritaire `#eab308` (jaune) · rdv_avenir `#93c5fd` (bleu clair) · rdv_fait `#1d4ed8` (bleu foncé) · signature `#f97316` (orange) · signe `#22c55e` (vert) · perdu `#ef4444` (rouge)
+- Définis dans la liste centrale `STATUTS` (tout en dérive : légende, boutons, compteurs, labels).
+- Simplification 8→6 faite le 2026-07-05 : suppression de "prospectee" (communes redevenues neutres) et fusion de "perdu_rdv" dans "perdu" (label unique "Perdu"). Une fonction `normalizeStatuts()` traduit à la lecture Firebase (`perdu_rdv`→`perdu`, `prospectee` retiré) + nettoyage unique de la base au chargement.
 
 ### Firebase
 projectId "communes-hdf". Documents : `statuts/communes`, `statuts/visites`, `statuts/rdv`.
@@ -94,16 +101,19 @@ projectId "communes-hdf". Documents : `statuts/communes`, `statuts/visites`, `st
 - Filtre département (pastilles 02/59/60/62/80).
 - Filtre population : existe dans le code mais plus accessible via l'UI (à ré-exposer un jour) — sert à cibler des tailles de communes pour les exports.
 - Sélecteur de date pour les rdv + surbrillance même jour.
+- **Clic sur petite commune (<200) ou grande ville (≥7000)** → popup simple nom+population (hors cible, aucun statut). Ces couches sont masquées par défaut (bouton "hors-cible").
 
 ---
 
 ## Feuille de route (chantiers restants, ordre logique)
 
-1. **Petites communes (<200 hab, 880)** : les rendre cliquables pour voir détail/population, SANS statut. Contours dans HDF_BG_GEO, données nom+pop déjà récupérées (fichier `communes-plus7000.json`).
-2. **Surcouches thématiques** : filtres à pastilles cumulables, open data (éoliennes d'abord, puis 5G…). Ajouter un critère = ajouter une donnée, pas recoder.
-3. **Pont HubSpot → carte** (gros morceau, carburant du reste) : faire remonter les rdv HubSpot automatiquement. Voir cadrage détaillé.
-4. **Vue Agenda** : remplacer les onglets inutiles (Politique, Connectivité, ex-ICP) par Prospection + Agenda. Sélection d'une plage de dates → affiche les communes avec rdv sur la période (physiques en couleur vive, visios en clair, communes actives à potentiel en gris uni sauf perdus). Débouché du pont HubSpot.
-5. **Duplication Auvergne-Rhône-Alpes** : 03 Allier, 63 Puy-de-Dôme, 15 Cantal, 43 Haute-Loire, 07 Ardèche. Carte séparée + base Firebase propre.
+- ✅ **Petites communes (<200 hab, 880) cliquables** — FAIT le 2026-07-05 (voir `PETITES_COMMUNES_GEO` + toggle hors-cible dans Structure des données).
+- ✅ **Simplification statuts 8→6** — FAIT le 2026-07-05 (voir section statuts).
+
+1. **Surcouches thématiques** : filtres à pastilles cumulables, open data (éoliennes d'abord, puis 5G…). Ajouter un critère = ajouter une donnée, pas recoder.
+2. **Pont HubSpot → carte** (gros morceau, carburant du reste) : faire remonter les rdv HubSpot automatiquement. Voir cadrage détaillé.
+3. **Vue Agenda** : remplacer les onglets inutiles (Politique, Connectivité, ex-ICP) par Prospection + Agenda. Sélection d'une plage de dates → affiche les communes avec rdv sur la période (physiques en couleur vive, visios en clair, communes actives à potentiel en gris uni sauf perdus). Débouché du pont HubSpot.
+4. **Duplication Auvergne-Rhône-Alpes** : 03 Allier, 63 Puy-de-Dôme, 15 Cantal, 43 Haute-Loire, 07 Ardèche. Carte séparée + base Firebase propre.
 
 ---
 
