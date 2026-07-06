@@ -176,13 +176,7 @@ window._syncFirebase = function() {
       <input type="text" id="search-input" placeholder="Rechercher une commune..." autocomplete="off">
       <div id="search-results"></div>
     </div>
-    <div id="mode-tabs">
-      
-      <button class="mode-btn active" data-mode="prospection">Prospection</button>
-      <button class="mode-btn" data-mode="politique">Politique</button>
-      <button class="mode-btn" data-mode="connectivite">Connectivit&eacute;</button>
-      <div id="mode-indicator"></div>
-    </div>
+    <!-- Barre d'onglets retirée : la carte est toujours en mode prospection. Bord politique + couverture réseau sont visibles dans le détail de chaque commune. -->
     <button id="toggle-horscible-btn" onclick="window.toggleHorsCible()" style="padding:6px 12px;border:1px solid rgba(0,0,0,0.15);border-radius:8px;background:#fff;cursor:pointer;font-size:12px;margin-right:6px;">👁️ Afficher hors-cible</button>
     <button onclick="window._syncFirebase()" style="padding:6px 12px;border:1px solid rgba(0,0,0,0.15);border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:#374151;margin-left:8px;">⟳ Sync</button>
     <span id="region-label">Hauts-de-France &middot; 02 / 59 / 60 / 62 / 80</span>
@@ -292,12 +286,12 @@ var PETITES_COMMUNES_GEO = {"type":"FeatureCollection","features":[{"type":"Feat
 
   // ─── Statuts commerciaux ──────────────────────────────────────────────────────
  var STATUTS = [
-  { key: 'perdu',          label: 'Perdu',                color: '#ef4444' },
+  { key: 'prioritaire',    label: 'Prioritaire',           color: '#eab308' },
   { key: 'rdv_avenir',     label: 'Rdv à venir',           color: '#93c5fd' },
   { key: 'rdv_fait',       label: 'Rdv fait',              color: '#1d4ed8' },
   { key: 'signature',      label: 'En cours de signature', color: '#f97316' },
   { key: 'signe',          label: 'Signé',                 color: '#22c55e' },
-  { key: 'prioritaire',    label: 'Prioritaire',           color: '#eab308' }
+  { key: 'perdu',          label: 'Perdu',                color: '#ef4444' }
 ];
   var STATUT_MAP = {};
   STATUTS.forEach(function(s) { STATUT_MAP[s.key] = s; });
@@ -630,6 +624,23 @@ if (!st) {
       vvBadge.textContent = 'Vid\u00e9overbalisation';
       badgeRow.appendChild(vvBadge);
     }
+
+    // Couverture réseau (intégrée au détail commune : remplace l'ancien mode "Connectivité")
+    [
+      { on: !!d['5g'],  label: '5G',    color: '#4ecdc4' },
+      { on: !!d['4g'],  label: '4G',    color: '#3a7bd5' },
+      { on: !!d.fibre,  label: 'Fibre', color: '#a855f7' }
+    ].forEach(function(cov) {
+      var covBadge = document.createElement('span');
+      covBadge.className = 'detail-badge';
+      if (cov.on) {
+        covBadge.style.cssText = 'background:' + cov.color + '22;color:' + cov.color + ';border:1px solid ' + cov.color + '55;';
+      } else {
+        covBadge.style.cssText = 'background:rgba(0,0,0,0.04);color:#c0c4cc;border:1px solid rgba(0,0,0,0.10);text-decoration:line-through;';
+      }
+      covBadge.textContent = cov.label;
+      badgeRow.appendChild(covBadge);
+    });
 
     headerSec.appendChild(badgeRow);
 
@@ -2020,8 +2031,9 @@ if (!st) {
     legSec.appendChild(grayRow);
     container.appendChild(legSec);
 
-    // Liste des communes par statut
+    // Liste des communes par statut (pas de menu déroulant pour les "Perdu" : trop nombreuses, restent visibles dans la légende du haut)
     STATUTS.forEach(function(st) {
+      if (st.key === 'perdu') return;
       var items = [];
       for (var code in communeStatuts) {
         if (communeStatuts[code] === st.key && hdf[code]) items.push(code);
