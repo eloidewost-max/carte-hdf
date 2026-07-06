@@ -1,7 +1,16 @@
 # Large source data files (générées, pas nécessaires pour le site)
+# L'app (index.html) embarque toutes ses données en dur : aucun .json/.csv chargé au runtime.
+*.json
+!package.json
+!vercel.json
+*.csv
 presidentielle-2022-t1-communes.csv
 resultats_municipales_2026_t1.csv
 resultats_municipales_2026.csv
+
+# Sauvegardes locales du fichier carte (gardées sur le disque, hors dépôt)
+hdf-map-AVANT-*.html
+code-pour-audit.txt
 
 # Scripts de scraping (génèrent les données, pas le site)
 build_csv_t1.py
