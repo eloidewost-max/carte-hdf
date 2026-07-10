@@ -239,10 +239,10 @@ var PETITES_COMMUNES_GEO = {"type":"FeatureCollection","features":[{"type":"Feat
   var REGIONS = {
     hdf: { label:'Hauts-de-France', short:'HDF', codes:['02','59','60','62','80'],
            depts:[{code:'02',name:'Aisne'},{code:'59',name:'Nord'},{code:'60',name:'Oise'},{code:'62',name:'Pas-de-Calais'},{code:'80',name:'Somme'}],
-           center:[50.15,2.8], zoom:9 },
+           center:[49.98, 2.81], zoom:9 },
     ara: { label:'Auvergne-Rhône-Alpes', short:'ARA', codes:['03','63','15','43','07'],
            depts:[{code:'03',name:'Allier'},{code:'63',name:'Puy-de-Dôme'},{code:'15',name:'Cantal'},{code:'43',name:'Haute-Loire'},{code:'07',name:'Ardèche'}],
-           center:[45.3,3.4], zoom:8 }
+           center:[45.52, 3.49], zoom:9 }
   };
   var activeRegion = 'hdf'; // écrasé par l'écran de choix au démarrage
   function inActiveRegion(code){
@@ -883,8 +883,8 @@ if (!st) {
     grandesVillesLayer = L.geoJSON(GRANDES_VILLES_GEO, {
       style: function(feature) {
         if (!inActiveRegion(feature.properties.codgeo)) return STYLE_HIDDEN;
-        return { fillColor: '#b5b5b5', fillOpacity: 0.6,
-                 weight: 0.4, color: '#9a9a9a', opacity: 0.6,
+        return { fillColor: '#8a8a8a', fillOpacity: 0.62,
+                 weight: 0.4, color: '#6f6f6f', opacity: 0.7,
                  interactive: true, dashArray: null };
       },
       onEachFeature: function(feature, layer) {
@@ -929,8 +929,8 @@ if (!st) {
     petitesCommunesLayer = L.geoJSON(PETITES_COMMUNES_GEO, {
       style: function(feature) {
         if (!inActiveRegion(feature.properties.codgeo)) return STYLE_HIDDEN;
-        return { fillColor: '#b5b5b5', fillOpacity: 0.6,
-                 weight: 0.4, color: '#9a9a9a', opacity: 0.6,
+        return { fillColor: '#8a8a8a', fillOpacity: 0.62,
+                 weight: 0.4, color: '#6f6f6f', opacity: 0.7,
                  interactive: true, dashArray: null };
       },
       onEachFeature: function(feature, layer) {
@@ -2420,9 +2420,15 @@ if (!st) {
     if (typeof refreshVisiteLabels === 'function') refreshVisiteLabels();
     if (typeof refreshGendarmerieLabels === 'function') refreshGendarmerieLabels();
 
-    // centrage (setView déterministe — fitBounds peut mal calculer selon le timing/la taille de carte)
-    if (region === 'tout') map.setView([47.7, 3.0], 6);
-    else map.setView(REGIONS[region].center, REGIONS[region].zoom);
+    // centrage : fitBounds sur les limites de la région → chaque région remplit la vue,
+    // bien centrée, quel que soit son étirement. Limites fixes + animate:false = déterministe
+    // (évite le bug de zoom aléatoire observé avec fitBounds sur des layers en cours d'animation).
+    var RBOUNDS = {
+      hdf:  [[48.85, 1.35], [51.10, 4.30]],
+      ara:  [[44.25, 2.05], [46.80, 4.90]],
+      tout: [[43.90, 1.20], [51.30, 4.90]]
+    };
+    map.fitBounds(RBOUNDS[region], { padding: [20, 20], animate: false });
 
     // label région (barre du haut)
     var rl = document.getElementById('region-label');
