@@ -64,3 +64,6 @@ hdf-map.backup.html
 patch_hdf*.py
 Patch - Juin 2026/
 .DS_Store
+
+# Backup avant chantier carte-france (gardé en local)
+hdf-map-BACKUP-*.html
