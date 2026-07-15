@@ -67,3 +67,6 @@ Patch - Juin 2026/
 
 # Backup avant chantier carte-france (gardé en local)
 hdf-map-BACKUP-*.html
+
+# Sauvegardes locales carte-france
+carte-france-AVANT-*.html
