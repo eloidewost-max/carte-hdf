@@ -228,9 +228,10 @@ var PETITES_COMMUNES_GEO = {"type":"FeatureCollection","features":[{"type":"Feat
     preferCanvas: true
   });
 
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '\u00a9 OpenStreetMap contributors | Donn\u00e9es: data.gouv.fr',
-    maxZoom: 19
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles \u00a9 Esri - Esri, DeLorme, NAVTEQ | Donn\u00e9es: data.gouv.fr',
+    maxZoom: 19,
+    maxNativeZoom: 16
   }).addTo(map);
 
   // Données intégrées inline — pas de fetch nécessaire
