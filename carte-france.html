@@ -134,6 +134,157 @@ firebase.initializeApp(firebaseConfigAra, 'ara');
 // Deux bases ancrées au TERRITOIRE (pas aux personnes) : HDF -> communes-hdf, ARA -> communes-ara.
 var DBS = { hdf: firebase.firestore(), ara: firebase.firestore(firebase.app('ara')) };
 var db = DBS.hdf; // compat historique : quelques fonctions référencent encore `db` (= base HDF)
+
+// ═══ MODE TEST (?test=1 à la fin de l'adresse) : AUCUNE écriture n'est envoyée à Firebase ═══
+// Les écritures sont interceptées au niveau du SDK Firestore (même un appel oublié ne passe pas),
+// comparées au contenu réel de la base, puis affichées dans un journal à l'écran. Les lectures restent actives.
+window.__TEST_MODE = /[?&]test=1(&|$)/.test(location.search);
+(function() {
+  if (!window.__TEST_MODE) return;
+  var BASES = { 'communes-hdf': 'HDF', 'communes-ara': 'ARA' };
+  var DOCS = { communes: 'statuts', visites: 'visites', rdv: 'rdv', notes: 'notes' };
+  var MAX_LIGNES = 25;
+  var COUL = { '+': '#15803d', '~': '#b45309', '−': '#b91c1c' };
+  var journal = [], panel = null, corps = null, compteur = null, reduit = false;
+  var origGet;
+
+  function baseOf(ref) { var p = ref.firestore.app.options.projectId; return { id: p, label: BASES[p] || p }; }
+  function isDelete(v) { return !!v && typeof v.isEqual === 'function' && v.isEqual(firebase.firestore.FieldValue.delete()); }
+  function nomCommune(code) {
+    var d = (typeof HDF_DATA !== 'undefined' && HDF_DATA[code]) || (typeof PETITES_COMMUNES_DATA !== 'undefined' && PETITES_COMMUNES_DATA[code]);
+    return d && d.n ? d.n : '';
+  }
+  function fmt(v) {
+    if (v === undefined) return '∅';
+    var s = typeof v === 'string' ? v : JSON.stringify(v);
+    return s.length > 60 ? s.slice(0, 57) + '…' : s;
+  }
+  function cheminTexte(f) { return typeof f === 'string' ? f : String(f && f._delegate && f._delegate._internalPath || f); }
+  function argsEnObjet(args) {
+    if (args.length === 1 && typeof args[0] === 'object' && !(args[0] instanceof firebase.firestore.FieldPath)) return args[0];
+    var o = {}; for (var i = 0; i + 1 < args.length; i += 2) o[cheminTexte(args[i])] = args[i + 1]; return o;
+  }
+  // Écart entre la base réelle (avant) et ce qui serait écrit (après). partiel = seuls les champs envoyés sont touchés.
+  function ecart(avant, apres, partiel) {
+    var ch = [], k;
+    for (k in apres) {
+      if (isDelete(apres[k])) { if (k in avant) ch.push({ t: '−', k: k, a: avant[k] }); }
+      else if (!(k in avant)) ch.push({ t: '+', k: k, b: apres[k] });
+      else if (JSON.stringify(avant[k]) !== JSON.stringify(apres[k])) ch.push({ t: '~', k: k, a: avant[k], b: apres[k] });
+    }
+    if (!partiel) for (k in avant) if (!(k in apres)) ch.push({ t: '−', k: k, a: avant[k] });
+    return ch;
+  }
+  function noter(ref, type, donnees, opts) {
+    var e = { h: new Date(), base: baseOf(ref), doc: ref.id, type: type,
+              partiel: type === 'update' || !!(opts && (opts.merge || opts.mergeFields)),
+              n: donnees ? Object.keys(donnees).length : 0, ecart: null, err: null };
+    console.log('[MODE TEST] écriture bloquée →', e.base.id, ref.path, type, donnees, opts || '');
+    journal.unshift(e); afficher();
+    origGet.call(ref).then(function(snap) {
+      var avant = snap.exists ? snap.data() : {};
+      e.ecart = type === 'delete'
+        ? Object.keys(avant).map(function(k) { return { t: '−', k: k, a: avant[k] }; })
+        : ecart(avant, donnees || {}, e.partiel);
+      console.log('[MODE TEST] changement réel →', e.base.id, ref.path, e.ecart);
+      afficher();
+    }).catch(function(err) { e.err = err.message; afficher(); });
+  }
+
+  function el(tag, css, txt) { var d = document.createElement(tag); if (css) d.style.cssText = css; if (txt != null) d.textContent = txt; return d; }
+  function construire() {
+    if (panel) return true;
+    if (!document.body) return false;
+    document.title = '🧪 TEST — ' + document.title;
+    var mapEl = document.getElementById('map');
+    if (mapEl) mapEl.appendChild(el('div', 'position:absolute;inset:0;border:4px solid #d97706;pointer-events:none;z-index:999;'));
+    // Journal posé en bas à gauche de la CARTE (à droite de la colonne de 340px), pleine largeur sur mobile.
+    var css = el('style', null, '#test-journal{position:fixed;left:352px;bottom:40px;width:min(440px,max(280px,calc(100vw - 744px)));max-height:45vh;display:flex;flex-direction:column;z-index:2500;background:#fff;border:2px solid #d97706;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);font:12px/1.45 system-ui,-apple-system,sans-serif;color:#1e2025;}'
+      + '@media (max-width:768px){#test-journal{left:12px;bottom:12px;width:calc(100vw - 24px);}}');
+    document.head.appendChild(css);
+    panel = el('div');
+    panel.id = 'test-journal';
+    var tete = el('div', 'display:flex;align-items:center;gap:6px;padding:8px 10px;background:#d97706;color:#fff;border-radius:7px 7px 0 0;font-weight:700;');
+    var btnCss = 'background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.55);color:#fff;border-radius:5px;padding:2px 8px;font:inherit;font-weight:600;cursor:pointer;';
+    tete.appendChild(el('span', 'flex:1;white-space:nowrap;', '🧪 MODE TEST — rien n’est envoyé'));
+    compteur = el('span', 'font-weight:400;white-space:nowrap;');
+    tete.appendChild(compteur);
+    var bVider = el('button', btnCss, 'Vider');
+    bVider.onclick = function() { journal = []; afficher(); };
+    var bReduire = el('button', btnCss, 'Réduire');
+    bReduire.onclick = function() { reduit = !reduit; bReduire.textContent = reduit ? 'Ouvrir' : 'Réduire'; afficher(); };
+    var params = new URLSearchParams(location.search); params.delete('test');
+    var q = params.toString();
+    var quitter = el('a', btnCss + 'text-decoration:none;', 'Quitter');
+    quitter.href = location.pathname + (q ? '?' + q : '') + location.hash;
+    tete.appendChild(bVider); tete.appendChild(bReduire); tete.appendChild(quitter);
+    corps = el('div', 'overflow-y:auto;padding:2px 10px 8px;');
+    panel.appendChild(tete); panel.appendChild(corps);
+    document.body.appendChild(panel);
+    return true;
+  }
+  function afficher() {
+    if (!construire()) return;
+    var nb = journal.length, s = nb > 1 ? 's' : '';
+    compteur.textContent = nb + ' bloquée' + s;
+    corps.style.display = reduit ? 'none' : '';
+    corps.textContent = '';
+    if (!nb) {
+      corps.appendChild(el('div', 'padding:8px 0;color:#6b7280;', 'Aucune écriture pour l’instant. Modifie un statut, une visite, un rdv ou une note : la carte affichera ici ce qu’elle aurait envoyé, et dans quelle base.'));
+      return;
+    }
+    journal.forEach(function(e) {
+      var bloc = el('div', 'padding:8px 0;border-bottom:1px solid #eee;');
+      bloc.appendChild(el('div', 'color:#6b7280;', e.h.toLocaleTimeString('fr-FR') + ' · base ' + e.base.label + ' (' + e.base.id + ') › ' + (DOCS[e.doc] || e.doc)));
+      var nature, couleur, p = e.n > 1 ? 's' : '';
+      if (e.type === 'delete') { nature = 'SUPPRESSION du document entier'; couleur = '#b91c1c'; }
+      else if (e.partiel) { nature = 'Écriture ciblée : ' + e.n + ' commune' + p + ' envoyée' + p; couleur = '#15803d'; }
+      else { nature = 'Réécriture COMPLÈTE de la liste : ' + e.n + ' commune' + p + ' envoyée' + p; couleur = '#b45309'; }
+      bloc.appendChild(el('div', 'font-weight:700;color:' + couleur + ';', nature));
+      if (e.err) bloc.appendChild(el('div', 'color:#b91c1c;', 'Comparaison impossible : ' + e.err));
+      else if (!e.ecart) bloc.appendChild(el('div', 'color:#6b7280;', 'Comparaison avec la base en cours…'));
+      else if (!e.ecart.length) bloc.appendChild(el('div', 'color:#6b7280;', 'Changement réel : aucun (la base resterait identique)'));
+      else {
+        var nc = e.ecart.length;
+        bloc.appendChild(el('div', '', 'Changement réel : ' + nc + ' commune' + (nc > 1 ? 's' : '')));
+        e.ecart.slice(0, MAX_LIGNES).forEach(function(c) {
+          var nom = nomCommune(c.k), lib = c.k + (nom ? ' ' + nom : '') + ' : ';
+          lib += c.t === '+' ? fmt(c.b) : c.t === '~' ? fmt(c.a) + ' → ' + fmt(c.b) : 'retiré (était ' + fmt(c.a) + ')';
+          bloc.appendChild(el('div', 'font-family:ui-monospace,Menlo,monospace;font-size:11px;color:' + COUL[c.t] + ';', c.t + ' ' + lib));
+        });
+        if (nc > MAX_LIGNES) bloc.appendChild(el('div', 'color:#6b7280;', '… et ' + (nc - MAX_LIGNES) + ' autres (liste complète dans la console)'));
+      }
+      corps.appendChild(bloc);
+    });
+  }
+
+  // Interception : on remplace les méthodes d'écriture du SDK (communes aux deux bases).
+  // Si ça échoue, on coupe le réseau Firebase plutôt que de laisser passer une vraie écriture.
+  try {
+    var bloquer = function(f) { f.__modeTest = true; return f; };
+    var refProto = Object.getPrototypeOf(DBS.hdf.collection('statuts').doc('communes'));
+    var colProto = Object.getPrototypeOf(DBS.hdf.collection('statuts'));
+    var lotProto = Object.getPrototypeOf(DBS.hdf.batch());
+    var fsProto = Object.getPrototypeOf(DBS.hdf);
+    origGet = refProto.get;
+    refProto.set = bloquer(function(d, o) { noter(this, 'set', d, o); return Promise.resolve(); });
+    refProto.update = bloquer(function() { noter(this, 'update', argsEnObjet(arguments)); return Promise.resolve(); });
+    refProto['delete'] = bloquer(function() { noter(this, 'delete', null); return Promise.resolve(); });
+    colProto.add = bloquer(function(d) { var r = this.doc(); noter(r, 'set', d); return Promise.resolve(r); });
+    lotProto.set = bloquer(function(r, d, o) { noter(r, 'set', d, o); return this; });
+    lotProto.update = bloquer(function(r) { noter(r, 'update', argsEnObjet(Array.prototype.slice.call(arguments, 1))); return this; });
+    lotProto['delete'] = bloquer(function(r) { noter(r, 'delete', null); return this; });
+    lotProto.commit = bloquer(function() { return Promise.resolve(); });
+    fsProto.runTransaction = bloquer(function() { return Promise.reject(new Error('MODE TEST : transaction bloquée')); });
+    if (!Object.getPrototypeOf(DBS.ara.collection('statuts').doc('communes')).set.__modeTest) throw new Error('base ARA non interceptée');
+  } catch (err) {
+    DBS.hdf.disableNetwork(); DBS.ara.disableNetwork();
+    console.error('[MODE TEST] interception impossible, réseau Firebase coupé par sécurité :', err);
+    alert('MODE TEST : impossible de bloquer les écritures. Firebase a été déconnecté par sécurité. Ferme cette page.');
+    return;
+  }
+  document.addEventListener('DOMContentLoaded', afficher);
+})();
 var HDF_PREFIXES = { '02':1,'59':1,'60':1,'62':1,'80':1 };
 var ARA_PREFIXES = { '03':1,'63':1,'15':1,'43':1,'07':1 };
 window.regionOfCode = function(code){ var p=(code||'').slice(0,2); if(HDF_PREFIXES[p])return 'hdf'; if(ARA_PREFIXES[p])return 'ara'; return null; };
