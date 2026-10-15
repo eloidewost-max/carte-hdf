@@ -73,3 +73,8 @@ carte-france-AVANT-*.html
 
 # Dossier d'archives des vieilles versions (gardé en local, jamais publié)
 Archives/
+
+# Documents internes et code du pont HubSpot (gardés en local, jamais publiés)
+cadrage-pont-hubspot.md
+consignes-saisie-hubspot-BDR.md
+functions/
