@@ -175,7 +175,15 @@ window.__TEST_MODE = /[?&]test=1(&|$)/.test(location.search);
     if (!partiel) for (k in avant) if (!(k in apres)) ch.push({ t: '−', k: k, a: avant[k] });
     return ch;
   }
+  // Copie figée au moment de l'écriture (sinon une modification ultérieure du même objet fausserait le journal).
+  function figer(d) {
+    if (!d) return d;
+    var o = {};
+    for (var k in d) o[k] = (d[k] === undefined || isDelete(d[k])) ? d[k] : JSON.parse(JSON.stringify(d[k]));
+    return o;
+  }
   function noter(ref, type, donnees, opts) {
+    donnees = figer(donnees);
     var e = { h: new Date(), base: baseOf(ref), doc: ref.id, type: type,
               partiel: type === 'update' || !!(opts && (opts.merge || opts.mergeFields)),
               n: donnees ? Object.keys(donnees).length : 0, ecart: null, err: null };
@@ -290,24 +298,46 @@ var ARA_PREFIXES = { '03':1,'63':1,'15':1,'43':1,'07':1 };
 window.regionOfCode = function(code){ var p=(code||'').slice(0,2); if(HDF_PREFIXES[p])return 'hdf'; if(ARA_PREFIXES[p])return 'ara'; return null; };
 // GARDE-FOU : on n'écrit dans une base QUE si elle a déjà été chargée (empêche d'écraser les données par un objet vide au démarrage).
 window.__loaded = { hdf:false, ara:false };
-function splitByRegion(obj){ var s={hdf:{},ara:{}}; for(var k in obj){var r=window.regionOfCode(k); if(r)s[r][k]=obj[k];} return s; }
-// Écriture PARTITIONNÉE : chaque base ne reçoit QUE les communes de sa région.
-window.saveToFirebase = async function(statuts) {
-  var s = splitByRegion(statuts);
-  if (window.__loaded.hdf) await DBS.hdf.collection("statuts").doc("communes").set(s.hdf);
-  if (window.__loaded.ara) await DBS.ara.collection("statuts").doc("communes").set(s.ara);
+// Message rouge visible quelques secondes si une sauvegarde échoue (avant : échec silencieux).
+function alerteEcriture(msg) {
+  console.error('[écriture] ' + msg);
+  var d = document.createElement('div');
+  d.textContent = '⚠️ Non enregistré : ' + msg;
+  d.style.cssText = 'position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:3000;background:#b91c1c;color:#fff;padding:8px 14px;border-radius:8px;font:600 13px/1.4 system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:90vw;';
+  document.body.appendChild(d);
+  setTimeout(function() { d.remove(); }, 8000);
+}
+// ÉCRITURE CIBLÉE : on n'envoie QUE la commune modifiée, et seulement à la base de SA région.
+// doc = 'communes' (statuts) | 'visites' | 'rdv' | 'notes'. valeur absente/null = la commune est retirée de la liste.
+// Remplace les anciennes réécritures de la liste complète, qui pouvaient écraser le travail d'un collègue.
+window.ecrireCommune = function(doc, code, valeur) {
+  var reg = window.regionOfCode(code);
+  if (!reg) { alerteEcriture('code ' + code + ' hors région'); return Promise.resolve(); }
+  if (!window.__loaded[reg]) { alerteEcriture('la base ' + reg.toUpperCase() + ' n’est pas encore chargée, réessaie dans un instant'); return Promise.resolve(); }
+  var ref = DBS[reg].collection('statuts').doc(doc);
+  var retrait = valeur === undefined || valeur === null;
+  var champ = {};
+  champ[code] = retrait ? firebase.firestore.FieldValue.delete() : valeur;
+  return ref.update(champ).catch(function(err) {
+    // Liste encore inexistante (toute première écriture de ce type dans cette base) : on la crée avec cette commune.
+    if (err && err.code === 'not-found') return retrait ? null : ref.set(champ, { merge: true });
+    throw err;
+  }).catch(function(err) {
+    alerteEcriture(doc + ' de ' + code + ' (' + (err && err.message || err) + ')');
+  });
 };
 // Simplification 8 -> 6 statuts : 'perdu_rdv' -> 'perdu' (fusion), 'prospectee' -> retiré (commune neutre).
-// Retourne { data: annuaire nettoyé, changed: true si au moins une valeur a été modifiée/retirée }.
+// Retourne { data: annuaire nettoyé, changed: true si au moins une valeur a été modifiée/retirée,
+//            corrections: { code: 'perdu' ou null (= à retirer) } pour ne réécrire QUE ces communes }.
 window.normalizeStatuts = function(raw) {
-  var out = {}, changed = false;
+  var out = {}, changed = false, corrections = {};
   for (var code in raw) {
     var v = raw[code];
-    if (v === 'prospectee') { changed = true; continue; }
-    if (v === 'perdu_rdv')  { out[code] = 'perdu'; changed = true; continue; }
+    if (v === 'prospectee') { changed = true; corrections[code] = null; continue; }
+    if (v === 'perdu_rdv')  { out[code] = 'perdu'; changed = true; corrections[code] = 'perdu'; continue; }
     out[code] = v;
   }
-  return { data: out, changed: changed };
+  return { data: out, changed: changed, corrections: corrections };
 };
 // Synchro désormais 100% live via les onSnapshot des DEUX bases (voir plus bas dans l'IIFE).
 // Cette ancienne fonction de sync manuelle devient un no-op inoffensif (le bouton "Sync" a été retiré).
@@ -380,7 +410,7 @@ var PETITES_COMMUNES_GEO = {"type":"FeatureCollection","features":[{"type":"Feat
   });
 
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles \u00a9 Esri - Esri, DeLorme, NAVTEQ | Donn\u00e9es: data.gouv.fr',
+    attribution: 'Tiles \u00a9 Esri \u2014 Esri, HERE, Garmin, \u00a9 OpenStreetMap contributors, and the GIS user community | Donn\u00e9es: data.gouv.fr',
     maxZoom: 19,
     maxNativeZoom: 16
   }).addTo(map);
@@ -518,10 +548,12 @@ var PETITES_COMMUNES_GEO = {"type":"FeatureCollection","features":[{"type":"Feat
       statutsBy[reg] = _norm.data;
       window.__loaded[reg] = true;
       communeStatuts = Object.assign({}, statutsBy.hdf, statutsBy.ara);
-      // Nettoyage unique PAR BASE (fusion perdu_rdv->perdu, retrait prospectee) : réécrit UNIQUEMENT sa base.
+      // Nettoyage unique PAR BASE (fusion perdu_rdv->perdu, retrait prospectee) : n'envoie QUE les communes corrigées.
       if (_norm.changed && !window.__migrated[reg]) {
         window.__migrated[reg] = true;
-        dbx.collection("statuts").doc("communes").set(_norm.data);
+        var _maj = {};
+        for (var _c in _norm.corrections) _maj[_c] = _norm.corrections[_c] === null ? firebase.firestore.FieldValue.delete() : _norm.corrections[_c];
+        dbx.collection("statuts").doc("communes").update(_maj).catch(function(err) { console.error('[nettoyage statuts]', reg, err); });
       }
       if (typeof geoLayer !== "undefined") geoLayer.setStyle(getStyle);
       if (typeof refreshStatusLabels === "function" && typeof statusLabelLayer !== "undefined") refreshStatusLabels();
@@ -533,25 +565,8 @@ var PETITES_COMMUNES_GEO = {"type":"FeatureCollection","features":[{"type":"Feat
     });
   });
 
-  window.saveVisites = function() {
-    var s = splitByRegion(communeVisites);
-    if (window.__loaded.hdf) DBS.hdf.collection("statuts").doc("visites").set(s.hdf);
-    if (window.__loaded.ara) DBS.ara.collection("statuts").doc("visites").set(s.ara);
-  };
-  window.saveRdv = function() {
-    var s = splitByRegion(communeRdv);
-    if (window.__loaded.hdf) DBS.hdf.collection("statuts").doc("rdv").set(s.hdf);
-    if (window.__loaded.ara) DBS.ara.collection("statuts").doc("rdv").set(s.ara);
-  };
-  window.saveNotes = function() {
-    var s = splitByRegion(communeNotes);
-    if (window.__loaded.hdf) DBS.hdf.collection("statuts").doc("notes").set(s.hdf);
-    if (window.__loaded.ara) DBS.ara.collection("statuts").doc("notes").set(s.ara);
-  };
-
-  function saveStatuts() {
-    if (window.saveToFirebase && Object.keys(communeStatuts).length > 0) window.saveToFirebase(communeStatuts);
-  }
+  // Toutes les sauvegardes (statut, visite, rdv, note) passent par window.ecrireCommune(doc, code, valeur) :
+  // une seule commune envoyée, à la base de sa région. Plus aucune réécriture de liste complète.
 
 
   var icpUpdateTimer = null;
@@ -875,7 +890,7 @@ if (!st) {
       function commitNote() {
         var v = noteTa.value.trim();
         if (v) communeNotes[theCode] = v; else delete communeNotes[theCode];
-        if (window.saveNotes) window.saveNotes();
+        window.ecrireCommune('notes', theCode, communeNotes[theCode]);
       }
       noteTa.addEventListener('input', function() {
         if (noteTimer) clearTimeout(noteTimer);
@@ -914,7 +929,7 @@ if (!st) {
           if (!communeVisites[code]) communeVisites[code] = {};
           communeVisites[code][v.key] = !communeVisites[code][v.key];
           if (!communeVisites[code].avenir && !communeVisites[code].faite) delete communeVisites[code];
-          window.saveVisites();
+          window.ecrireCommune('visites', code, communeVisites[code]);
           refreshVisiteLabels();
           renderVisiteBtns();
         });
@@ -967,7 +982,7 @@ if (!st) {
           } else {
             communeStatuts[code] = st.key;
           }
-          saveStatuts();
+          window.ecrireCommune('communes', code, communeStatuts[code]);
           refreshStatusLabels();
           renderStatutBtns();
           if (currentMode === 'prospection') {
@@ -1004,7 +1019,7 @@ if (!st) {
     rdvInput.addEventListener('change', function() {
       var val = rdvInput.value;
       if (val) { communeRdv[code] = val; } else { delete communeRdv[code]; }
-      window.saveRdv(); renderRdvBtn();
+      window.ecrireCommune('rdv', code, communeRdv[code]); renderRdvBtn();
     });
     rdvRow.appendChild(rdvInput);
     var rdvClearBtn = document.createElement('button');
@@ -1013,7 +1028,7 @@ if (!st) {
     rdvClearBtn.style.cssText = 'padding:9px 12px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;'
       + 'background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.12);color:#9ca3af;';
     rdvClearBtn.addEventListener('click', function() {
-      rdvInput.value = ''; delete communeRdv[code]; window.saveRdv(); renderRdvBtn();
+      rdvInput.value = ''; delete communeRdv[code]; window.ecrireCommune('rdv', code); renderRdvBtn();
     });
     rdvRow.appendChild(rdvClearBtn);
     rdvSec.appendChild(rdvRow);
@@ -1612,7 +1627,8 @@ if (!st) {
       date: new Date().toISOString(),
       statuts: communeStatuts,
       visites: communeVisites,
-      rdv: communeRdv
+      rdv: communeRdv,
+      notes: communeNotes
     };
     var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
