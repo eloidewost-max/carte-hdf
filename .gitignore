@@ -70,3 +70,6 @@ hdf-map-BACKUP-*.html
 
 # Sauvegardes locales carte-france
 carte-france-AVANT-*.html
+
+# Dossier d'archives des vieilles versions (gardé en local, jamais publié)
+Archives/
