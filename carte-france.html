@@ -426,6 +426,12 @@ var ROADS_LABELS = [{"ref":"A1","t":"A","reg":"hdf","ll":[49.11165,2.55294]},{"r
     zoomSnap: 0.5,
     preferCanvas: true
   });
+  // Routes et frontières dessinées sur leurs PROPRES couches, au-dessus des communes : une commune survolée
+  // (remise au premier plan pour son contour) ne peut plus les recouvrir. Couches non cliquables.
+  map.createPane('routes');     map.getPane('routes').style.zIndex = 440;     map.getPane('routes').style.pointerEvents = 'none';
+  map.createPane('frontieres'); map.getPane('frontieres').style.zIndex = 450; map.getPane('frontieres').style.pointerEvents = 'none';
+  var rendRoutes = L.canvas({ pane: 'routes' });
+  var rendFrontieres = L.canvas({ pane: 'frontieres' });
 
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Tiles \u00a9 Esri \u2014 Esri, HERE, Garmin, \u00a9 OpenStreetMap contributors, and the GIS user community | Donn\u00e9es: data.gouv.fr',
@@ -449,8 +455,13 @@ var ROADS_LABELS = [{"ref":"A1","t":"A","reg":"hdf","ll":[49.11165,2.55294]},{"r
            center:[45.64, 4.32], zoom:8 }
   };
   var activeRegion = 'hdf'; // écrasé par l'écran de choix au démarrage
+  // Départements décochés dans le panneau de gauche (choix mémorisé sur l'ordinateur de chacun).
+  var CLE_DEPTS_MASQUES = 'vizzia-carte-depts-masques';
+  var deptsMasques = {};
+  try { (JSON.parse(localStorage.getItem(CLE_DEPTS_MASQUES) || '[]') || []).forEach(function(d) { deptsMasques[d] = true; }); } catch (e) {}
   function inActiveRegion(code){
     var r = window.regionOfCode ? window.regionOfCode(code) : null;
+    if (r !== null && deptsMasques[String(code).slice(0, 2)]) return false; // département décoché
     // « Les deux » = HDF + T16 seulement : un code hors territoire (ex. Cantal, encore présent dans Firebase) n'est jamais compté.
     if (activeRegion === 'tout') return r !== null;
     return r === activeRegion;
@@ -589,7 +600,7 @@ var ROADS_LABELS = [{"ref":"A1","t":"A","reg":"hdf","ll":[49.11165,2.55294]},{"r
     dbx.collection("statuts").doc("rdv").onSnapshot(function(docSnap) {
       rdvBy[reg] = docSnap.exists ? docSnap.data() : {};
       communeRdv = Object.assign({}, rdvBy.hdf, rdvBy.ara);
-      if (typeof geoLayer !== 'undefined') geoLayer.setStyle(getStyle);
+      if (typeof geoLayer !== 'undefined') restylerCommunes();
     });
 
     dbx.collection("statuts").doc("notes").onSnapshot(function(docSnap) {
@@ -613,7 +624,7 @@ var ROADS_LABELS = [{"ref":"A1","t":"A","reg":"hdf","ll":[49.11165,2.55294]},{"r
         for (var _c in _norm.corrections) _maj[_c] = _norm.corrections[_c] === null ? firebase.firestore.FieldValue.delete() : _norm.corrections[_c];
         dbx.collection("statuts").doc("communes").update(_maj).catch(function(err) { console.error('[nettoyage statuts]', reg, err); });
       }
-      if (typeof geoLayer !== "undefined") geoLayer.setStyle(getStyle);
+      if (typeof geoLayer !== "undefined") restylerCommunes();
       if (typeof refreshStatusLabels === "function" && typeof statusLabelLayer !== "undefined") refreshStatusLabels();
       if (typeof renderCmdProspection === "function" && currentMode === "prospection") {
         document.getElementById("cmd-content").textContent = "";
@@ -632,7 +643,7 @@ var ROADS_LABELS = [{"ref":"A1","t":"A","reg":"hdf","ll":[49.11165,2.55294]},{"r
     icpScoreCache = null;
     if (icpUpdateTimer) clearTimeout(icpUpdateTimer);
     icpUpdateTimer = setTimeout(function() {
-      geoLayer.setStyle(getStyle);
+      restylerCommunes();
       icpListLimit = 200;
       renderICPList();
       updateBottomBar();
@@ -1055,7 +1066,7 @@ if (!st) {
           refreshStatusLabels();
           renderStatutBtns();
           if (currentMode === 'prospection') {
-            geoLayer.setStyle(getStyle);
+            restylerCommunes();
             document.getElementById('cmd-content').textContent = '';
             renderCmdProspection();
             updateBottomBar();
@@ -1089,7 +1100,7 @@ if (!st) {
       var val = rdvInput.value;
       if (val) { communeRdv[code] = val; } else { delete communeRdv[code]; }
       window.ecrireCommune('rdv', code, communeRdv[code]); renderRdvBtn();
-      geoLayer.setStyle(getStyle); // une date de rdv à venir rend la commune toujours visible
+      restylerCommunes(); // une date de rdv à venir rend la commune toujours visible
     });
     rdvRow.appendChild(rdvInput);
     var rdvClearBtn = document.createElement('button');
@@ -1099,7 +1110,7 @@ if (!st) {
       + 'background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.12);color:#9ca3af;';
     rdvClearBtn.addEventListener('click', function() {
       rdvInput.value = ''; delete communeRdv[code]; window.ecrireCommune('rdv', code); renderRdvBtn();
-      geoLayer.setStyle(getStyle);
+      restylerCommunes();
     });
     rdvRow.appendChild(rdvClearBtn);
     rdvSec.appendChild(rdvRow);
@@ -1171,7 +1182,7 @@ if (!st) {
     return { color: ROAD_COLORS[p.t] || '#888', weight: (p.t === 'A' ? 2.6 : 1.8),
              opacity: 0.9, interactive: false };
   }
-  var roadsLayer = L.geoJSON(ROADS_GEO, { style: roadStyle, interactive: false });
+  var roadsLayer = L.geoJSON(ROADS_GEO, { style: roadStyle, interactive: false, renderer: rendRoutes });
 
   // Étiquettes de n° de route (A75, N88…) : affichées seulement au zoom (illisibles en vue région), filtrées par région active.
   var roadLabelLayer = L.layerGroup();
@@ -1400,6 +1411,21 @@ if (!st) {
   }
   window.clearRdvHighlight = clearRdvHighlight;
 
+  // Une commune non affichée (autre région, département décoché, hors filtre de population) est RETIRÉE de la carte,
+  // pas seulement rendue transparente : elle ne coûte plus rien au dessin ni aux survols.
+  function synchroniserCommunesAffichees() {
+    for (var code in layerByCode) {
+      var lyr = layerByCode[code];
+      var present = geoLayer.hasLayer(lyr);
+      if (communeAffichee(code)) { if (!present) geoLayer.addLayer(lyr); }
+      else if (present) geoLayer.removeLayer(lyr);
+    }
+  }
+  // À utiliser à la place de geoLayer.setStyle(getStyle) : met à jour la liste des communes présentes, puis les couleurs.
+  function restylerCommunes() {
+    synchroniserCommunesAffichees();
+    geoLayer.setStyle(getStyle);
+  }
   var geoLayer = L.geoJSON(communesGeo, {
     style: getStyle,
     onEachFeature: function(feature, layer) {
@@ -1463,6 +1489,8 @@ if (!st) {
   });
     }
   }).addTo(map);
+  // Mode test uniquement : accès de diagnostic (compter les communes réellement présentes sur la carte, etc.)
+  if (window.__TEST_MODE) window.__carte = { map: map, geoLayer: geoLayer, layerByCode: layerByCode };
   communesGeo = null;
 
 
@@ -1470,10 +1498,10 @@ if (!st) {
   // Rangés dans des groupes de calques ; applyRegion() décide lesquels sont affichés.
   var boundaryStyle = function() { return { color: '#FFD700', opacity: 1, weight: 3, fill: false, interactive: false }; };
   hdfBoundaryLayer = L.layerGroup([
-    L.geoJSON(DEPT_BOUNDARIES, { style: boundaryStyle }),
-    L.geoJSON(HDF_BOUNDARY,   { style: boundaryStyle })
+    L.geoJSON(DEPT_BOUNDARIES, { style: boundaryStyle, renderer: rendFrontieres }),
+    L.geoJSON(HDF_BOUNDARY,   { style: boundaryStyle, renderer: rendFrontieres })
   ]);
-  araBoundaryLayer = L.layerGroup([ L.geoJSON(ARA_BOUNDARY, { style: boundaryStyle }) ]);
+  araBoundaryLayer = L.layerGroup([ L.geoJSON(ARA_BOUNDARY, { style: boundaryStyle, renderer: rendFrontieres }) ]);
 
   function makeDeptLabel(d) {
     var icon = L.divIcon({
@@ -1562,12 +1590,18 @@ if (!st) {
     }
   }
 
+  // Noms affichés à partir du zoom 10 (vue d'un secteur) et seulement autour de la zone visible :
+  // en vue d'ensemble les couleurs suffisent, et des centaines de textes ombrés rendaient les déplacements saccadés.
+  var ZOOM_NOMS = 10;
   function refreshStatusLabels() {
     statusLabelLayer.clearLayers();
+    if (map.getZoom() < ZOOM_NOMS) return;
+    var zoneVisible = map.getBounds().pad(0.15);
     for (var code in communeStatuts) {
       if (!communeAffichee(code)) continue;
       var d = hdf[code];
       if (!d || !d.lat || !d.lng) continue;
+      if (!zoneVisible.contains([d.lat, d.lng])) continue;
       var st = STATUT_MAP[communeStatuts[code]];
       if (!st) continue;
       if (activeStatutFilters.length > 0 && activeStatutFilters.indexOf(communeStatuts[code]) === -1) continue;
@@ -1589,6 +1623,7 @@ if (!st) {
     }
   }
   refreshStatusLabels();
+  map.on('moveend', refreshStatusLabels); // après chaque zoom ou déplacement
 
   // ─── Mode switching ───────────────────────────────────────────────────────────
   var MODE_COLORS = { icp: '#4ecdc4', politique: '#4a90d9', connectivite: '#8E24AA', prospection: '#f97316' };
@@ -1614,7 +1649,7 @@ if (!st) {
     if (mode === 'politique')         renderCmdPolitique();
     else if (mode === 'prospection')  renderCmdProspection();
     else                              renderCmdConnectivite();
-    geoLayer.setStyle(getStyle);
+    restylerCommunes();
     updateModeIndicator();
     updateBottomBar();
   }
@@ -1736,7 +1771,7 @@ if (!st) {
     allBtn.addEventListener('click', function() {
       DEPT_META.forEach(function(d) { activeDepts[d.code] = true; });
       icpScoreCache = null;
-      geoLayer.setStyle(getStyle);
+      restylerCommunes();
       icpListLimit = 200;
       renderICPList();
       updateBottomBar();
@@ -1761,7 +1796,7 @@ if (!st) {
     noneBtn.addEventListener('click', function() {
       DEPT_META.forEach(function(d) { activeDepts[d.code] = false; });
       icpScoreCache = null;
-      geoLayer.setStyle(getStyle);
+      restylerCommunes();
       icpListLimit = 200;
       renderICPList();
       updateBottomBar();
@@ -1791,7 +1826,7 @@ if (!st) {
       btn.addEventListener('click', function() {
         activeDepts[d.code] = !activeDepts[d.code];
         icpScoreCache = null;
-        geoLayer.setStyle(getStyle);
+        restylerCommunes();
         icpListLimit = 200;
         renderICPList();
         updateBottomBar();
@@ -2131,7 +2166,7 @@ if (!st) {
     allPill.textContent = 'Tous';
     allPill.addEventListener('click', function() {
       activeFilter = null;
-      geoLayer.setStyle(getStyle);
+      restylerCommunes();
       renderCmdPolitique();
       updateBottomBar();
     });
@@ -2145,7 +2180,7 @@ if (!st) {
       pill.textContent = fam.label;
       pill.addEventListener('click', function() {
         activeFilter = fam.key;
-        geoLayer.setStyle(getStyle);
+        restylerCommunes();
         renderCmdPolitique();
         updateBottomBar();
       });
@@ -2227,6 +2262,68 @@ if (!st) {
     container.appendChild(noteSec);
   }
 
+  // ─── Section « Départements affichés » du panneau de gauche ───
+  // Un département décoché sort du périmètre : retiré de la carte, des listes, des compteurs et de la recherche.
+  function appliquerDepts() {
+    try { localStorage.setItem(CLE_DEPTS_MASQUES, JSON.stringify(Object.keys(deptsMasques))); } catch (e) {}
+    restylerCommunes();
+    if (typeof refreshStatusLabels === 'function') refreshStatusLabels();
+    if (typeof refreshVisiteLabels === 'function') refreshVisiteLabels();
+    if (typeof refreshGendarmerieLabels === 'function') refreshGendarmerieLabels();
+    document.getElementById('cmd-content').textContent = '';
+    renderCmdProspection();
+    updateBottomBar();
+    if (typeof majFiltrePopUI === 'function') majFiltrePopUI();
+  }
+  function construireSectionDepts() {
+    var depts = activeRegion === 'tout' ? REGIONS.hdf.depts.concat(REGIONS.ara.depts) : REGIONS[activeRegion].depts;
+    var sec = document.createElement('div');
+    sec.className = 'cmd-section';
+    var tete = document.createElement('div');
+    tete.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
+    var titre = document.createElement('div');
+    titre.className = 'cmd-section-title';
+    titre.style.marginBottom = '0';
+    var nbAff = depts.filter(function(d) { return !deptsMasques[d.code]; }).length;
+    titre.textContent = 'DÉPARTEMENTS AFFICHÉS (' + nbAff + '/' + depts.length + ')';
+    tete.appendChild(titre);
+    var liens = document.createElement('div');
+    liens.style.cssText = 'display:flex;gap:8px;font-size:11px;';
+    [['Tous', false], ['Aucun', true]].forEach(function(x) {
+      var a = document.createElement('button');
+      a.textContent = x[0];
+      a.style.cssText = 'background:none;border:none;padding:0;color:#4ecdc4;font-size:11px;font-weight:600;cursor:pointer;';
+      a.addEventListener('click', function() {
+        depts.forEach(function(d) { if (x[1]) deptsMasques[d.code] = true; else delete deptsMasques[d.code]; });
+        appliquerDepts();
+      });
+      liens.appendChild(a);
+    });
+    tete.appendChild(liens);
+    sec.appendChild(tete);
+    var grille = document.createElement('div');
+    grille.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;';
+    depts.forEach(function(d) {
+      var lab = document.createElement('label');
+      var on = !deptsMasques[d.code];
+      lab.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:' + (on ? '#e2e4e9' : '#6b7280') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = on;
+      cb.style.cssText = 'accent-color:#4ecdc4;margin:0;cursor:pointer;';
+      cb.addEventListener('change', function() {
+        if (cb.checked) delete deptsMasques[d.code]; else deptsMasques[d.code] = true;
+        appliquerDepts();
+      });
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(d.code + ' · ' + d.name));
+      lab.title = d.code + ' ' + d.name;
+      grille.appendChild(lab);
+    });
+    sec.appendChild(grille);
+    return sec;
+  }
+
   // ─── renderCmdProspection ─────────────────────────────────────────────────────
   function renderCmdProspection() {
     var container = document.getElementById('cmd-content');
@@ -2286,6 +2383,9 @@ if (!st) {
     rdvSec.appendChild(clearRdvBtn);
     container.appendChild(rdvSec);
 
+    // Départements affichés (cases à cocher) : alléger la vue sur les départements utiles
+    container.appendChild(construireSectionDepts());
+
     // Légende statuts
     var legSec = document.createElement('div');
     legSec.className = 'cmd-section';
@@ -2318,7 +2418,7 @@ if (!st) {
         var idx = activeStatutFilters.indexOf(st.key);
         if (idx === -1) activeStatutFilters.push(st.key);
         else activeStatutFilters.splice(idx, 1);
-        geoLayer.setStyle(getStyle);
+        restylerCommunes();
         refreshStatusLabels();
         document.getElementById('cmd-content').textContent = '';
         renderCmdProspection();
@@ -2615,6 +2715,11 @@ if (!st) {
     searchResults.style.display = 'none';
     var layer = layerByCode[code];
     var dept = String(code).substring(0, 2);
+    if (layer && !geoLayer.hasLayer(layer)) {
+      // commune masquée (filtre, département décoché) : remise sur la carte le temps du clignotement
+      geoLayer.addLayer(layer);
+      setTimeout(restylerCommunes, 3600);
+    }
     if (layer) {
       if (_searchPulseTimer) { clearTimeout(_searchPulseTimer); _searchPulseTimer = null; }
       if (_lastSearchDept !== null && dept === _lastSearchDept) {
@@ -2684,7 +2789,7 @@ if (!st) {
     });
 
     // re-styler les couches (masque/affiche la bonne région)
-    if (typeof geoLayer !== 'undefined') geoLayer.setStyle(getStyle);
+    if (typeof geoLayer !== 'undefined') restylerCommunes();
     if (typeof bgLayer !== 'undefined' && bgLayer && bgLayer.options.style) bgLayer.setStyle(bgLayer.options.style);
     if (typeof roadsLayer !== 'undefined' && roadsVisible) { roadsLayer.setStyle(roadStyle); roadsLayer.bringToFront(); }
     if (typeof refreshRoadLabels === 'function') refreshRoadLabels();
@@ -2798,7 +2903,7 @@ if (!st) {
   function appliquerFiltrePop(immediat) {
     var faire = function() {
       popTimer = null;
-      geoLayer.setStyle(getStyle);
+      restylerCommunes();
       if (typeof refreshStatusLabels === 'function') refreshStatusLabels();
       if (typeof refreshVisiteLabels === 'function') refreshVisiteLabels();
       if (typeof refreshGendarmerieLabels === 'function') refreshGendarmerieLabels();
