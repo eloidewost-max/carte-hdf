@@ -2389,10 +2389,32 @@ if (!st) {
     // Légende statuts
     var legSec = document.createElement('div');
     legSec.className = 'cmd-section';
+    // Titre + raccourcis « Tous » (mettre en avant tous les statuts) / « Aucun » (annuler la mise en avant)
+    var legTete = document.createElement('div');
+    legTete.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;';
     var legTitle = document.createElement('div');
     legTitle.className = 'cmd-section-title';
+    legTitle.style.marginBottom = '0';
     legTitle.textContent = 'STATUTS COMMERCIAUX';
-    legSec.appendChild(legTitle);
+    legTete.appendChild(legTitle);
+    var legLiens = document.createElement('div');
+    legLiens.style.cssText = 'display:flex;gap:8px;';
+    [['Tous', true], ['Aucun', false]].forEach(function(x) {
+      var b = document.createElement('button');
+      b.textContent = x[0];
+      b.title = x[1] ? 'Mettre en avant tous les statuts (les communes sans statut passent en gris)' : 'Annuler la mise en avant (vue normale)';
+      b.style.cssText = 'background:none;border:none;padding:0;color:#4ecdc4;font-size:11px;font-weight:600;cursor:pointer;';
+      b.addEventListener('click', function() {
+        activeStatutFilters = x[1] ? STATUTS.map(function(s) { return s.key; }) : [];
+        restylerCommunes();
+        refreshStatusLabels();
+        document.getElementById('cmd-content').textContent = '';
+        renderCmdProspection();
+      });
+      legLiens.appendChild(b);
+    });
+    legTete.appendChild(legLiens);
+    legSec.appendChild(legTete);
 
     STATUTS.forEach(function(st) {
       var cnt = 0;
