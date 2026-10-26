@@ -509,7 +509,12 @@ var ROADS_LABELS = [{"ref":"A1","t":"A","reg":"hdf","ll":[49.11165,2.55294]},{"r
   // ─── State ───────────────────────────────────────────────────────────────────
   var currentMode  = 'prospection';
   var activeFilter = null;   // political family filter (politique + connectivite modes)
-  var activeStatutFilters = []; // filtre multi-statuts en mode prospection
+  // Statuts décochés dans la légende (clé du statut, ou 'sans' pour « Sans statut ») : leurs communes passent en gris
+  // estompé. Choix mémorisé sur l'ordinateur de chacun, comme les départements.
+  var CLE_STATUTS_MASQUES = 'vizzia-carte-statuts-masques';
+  var statutsMasques = {};
+  try { (JSON.parse(localStorage.getItem(CLE_STATUTS_MASQUES) || '[]') || []).forEach(function(s) { statutsMasques[s] = true; }); } catch (e) {}
+  function statutCoche(st) { return !statutsMasques[st || 'sans']; }
   var collapsedStatuts = {}; // memorise les categories repliees dans le panneau gauche
   var communeRdv = {}; // dates de rdv par commune { code: "YYYY-MM-DD" }
   var rdvHighlightDate = null; // date surbrillance mode C
@@ -795,10 +800,10 @@ var ROADS_LABELS = [{"ref":"A1","t":"A","reg":"hdf","ll":[49.11165,2.55294]},{"r
     var code = feature.properties.codgeo;
     var st = communeStatuts[code];
 if (!st) {
-      if (activeStatutFilters.length > 0) return STYLE_DIMMED;
+      if (!statutCoche(null)) return STYLE_DIMMED;
       return { fillColor: '#e6e8ec', fillOpacity: 1, weight: 0.2, color: '#d3d6db', opacity: 0.5, dashArray: null };
     }
-    if (activeStatutFilters.length > 0 && activeStatutFilters.indexOf(st) === -1) return STYLE_DIMMED;    var statut = STATUT_MAP[st];
+    if (!statutCoche(st)) return STYLE_DIMMED;    var statut = STATUT_MAP[st];
     return {
       fillColor: statut ? statut.color : '#6b7280',
       fillOpacity: 0.75,
@@ -1604,7 +1609,7 @@ if (!st) {
       if (!zoneVisible.contains([d.lat, d.lng])) continue;
       var st = STATUT_MAP[communeStatuts[code]];
       if (!st) continue;
-      if (activeStatutFilters.length > 0 && activeStatutFilters.indexOf(communeStatuts[code]) === -1) continue;
+      if (!statutCoche(communeStatuts[code])) continue;
       var icon = L.divIcon({
         className: '',
         html: '<div style="text-align:center;pointer-events:none;white-space:nowrap;">'
@@ -2275,6 +2280,13 @@ if (!st) {
     updateBottomBar();
     if (typeof majFiltrePopUI === 'function') majFiltrePopUI();
   }
+  function appliquerStatuts() {
+    try { localStorage.setItem(CLE_STATUTS_MASQUES, JSON.stringify(Object.keys(statutsMasques))); } catch (e) {}
+    restylerCommunes();
+    if (typeof refreshStatusLabels === 'function') refreshStatusLabels();
+    document.getElementById('cmd-content').textContent = '';
+    renderCmdProspection();
+  }
   function construireSectionDepts() {
     var depts = activeRegion === 'tout' ? REGIONS.hdf.depts.concat(REGIONS.ara.depts) : REGIONS[activeRegion].depts;
     var sec = document.createElement('div');
@@ -2402,61 +2414,49 @@ if (!st) {
     [['Tous', true], ['Aucun', false]].forEach(function(x) {
       var b = document.createElement('button');
       b.textContent = x[0];
-      b.title = x[1] ? 'Mettre en avant tous les statuts (les communes sans statut passent en gris)' : 'Annuler la mise en avant (vue normale)';
+      b.title = x[1] ? 'Tout cocher (vue normale)' : 'Tout décocher (puis cocher les statuts à voir)';
       b.style.cssText = 'background:none;border:none;padding:0;color:#4ecdc4;font-size:11px;font-weight:600;cursor:pointer;';
       b.addEventListener('click', function() {
-        activeStatutFilters = x[1] ? STATUTS.map(function(s) { return s.key; }) : [];
-        restylerCommunes();
-        refreshStatusLabels();
-        document.getElementById('cmd-content').textContent = '';
-        renderCmdProspection();
+        statutsMasques = {};
+        if (!x[1]) { STATUTS.forEach(function(s) { statutsMasques[s.key] = true; }); statutsMasques.sans = true; }
+        appliquerStatuts();
       });
       legLiens.appendChild(b);
     });
     legTete.appendChild(legLiens);
     legSec.appendChild(legTete);
 
-    STATUTS.forEach(function(st) {
+    // Une case par statut (aux couleurs du statut) + « Sans statut » : décoché = communes estompées en gris
+    var lignesStatut = STATUTS.map(function(st) { return { cle: st.key, label: st.label, color: st.color }; })
+      .concat([{ cle: 'sans', label: 'Sans statut', color: '#9ca3af' }]);
+    lignesStatut.forEach(function(ls) {
       var cnt = 0;
-      for (var c in communeStatuts) { if (communeStatuts[c] === st.key && inActiveRegion(c)) cnt++; }
-      var row = document.createElement('div');
+      if (ls.cle !== 'sans') { for (var c in communeStatuts) { if (communeStatuts[c] === ls.cle && inActiveRegion(c)) cnt++; } }
+      var on = !statutsMasques[ls.cle];
+      var row = document.createElement('label');
       row.className = 'legend-row';
-      var isActive = activeStatutFilters.indexOf(st.key) !== -1;
-      row.style.cssText = 'cursor:pointer;border-radius:4px;padding:2px 4px;transition:background 0.15s;'
-        + (isActive ? 'background:rgba(255,255,255,0.1);outline:1px solid ' + st.color + ';' : '');
-      var sw = document.createElement('div');
-      sw.className = 'legend-swatch';
-      sw.style.background = st.color;
-      row.appendChild(sw);
-      var lbl = document.createElement('span');
-      lbl.textContent = st.label;
-      lbl.style.fontWeight = isActive ? '700' : '400';
-      row.appendChild(lbl);
-      var c2 = document.createElement('span');
-      c2.className = 'legend-count';
-      c2.textContent = cnt;
-      row.appendChild(c2);
-      row.addEventListener('click', function() {
-        var idx = activeStatutFilters.indexOf(st.key);
-        if (idx === -1) activeStatutFilters.push(st.key);
-        else activeStatutFilters.splice(idx, 1);
-        restylerCommunes();
-        refreshStatusLabels();
-        document.getElementById('cmd-content').textContent = '';
-        renderCmdProspection();
+      row.style.cssText = 'cursor:pointer;display:flex;align-items:center;gap:8px;padding:2px 4px;color:' + (on ? '#e2e4e9' : '#6b7280') + ';';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = on;
+      cb.style.cssText = 'accent-color:' + ls.color + ';margin:0;cursor:pointer;width:14px;height:14px;flex-shrink:0;';
+      cb.addEventListener('change', function() {
+        if (cb.checked) delete statutsMasques[ls.cle]; else statutsMasques[ls.cle] = true;
+        appliquerStatuts();
       });
+      row.appendChild(cb);
+      var lbl = document.createElement('span');
+      lbl.textContent = ls.label;
+      lbl.style.cssText = 'flex:1;';
+      row.appendChild(lbl);
+      if (ls.cle !== 'sans') {
+        var c2 = document.createElement('span');
+        c2.className = 'legend-count';
+        c2.textContent = cnt;
+        row.appendChild(c2);
+      }
       legSec.appendChild(row);
     });
-    var grayRow = document.createElement('div');
-    grayRow.className = 'legend-row';
-    var graySw = document.createElement('div');
-    graySw.className = 'legend-swatch';
-    graySw.style.cssText = 'background:#e8eaef;border:1px solid #c8cad2;';
-    grayRow.appendChild(graySw);
-    var grayLbl = document.createElement('span');
-    grayLbl.textContent = 'Sans statut';
-    grayRow.appendChild(grayLbl);
-    legSec.appendChild(grayRow);
     container.appendChild(legSec);
 
     // Liste des communes par statut (pas de menu déroulant pour les "Perdu" : trop nombreuses, restent visibles dans la légende du haut)
