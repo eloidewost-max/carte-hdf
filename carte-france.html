@@ -1602,6 +1602,10 @@ if (!st) {
     statusLabelLayer.clearLayers();
     if (map.getZoom() < ZOOM_NOMS) return;
     var zoneVisible = map.getBounds().pad(0.15);
+    // Taille des noms qui grossit avec le zoom : 11 px à l'apparition (zoom 10), +2 px par cran, 20 px au maximum.
+    var taille = Math.max(11, Math.min(20, Math.round(11 + (map.getZoom() - ZOOM_NOMS) * 2)));
+    var point = Math.round(taille * 0.55);
+    var largeur = Math.round(120 * taille / 11), hauteur = taille + 6;
     for (var code in communeStatuts) {
       if (!communeAffichee(code)) continue;
       var d = hdf[code];
@@ -1613,15 +1617,15 @@ if (!st) {
       var icon = L.divIcon({
         className: '',
         html: '<div style="text-align:center;pointer-events:none;white-space:nowrap;">'
-            + '<span style="font-size:11px;font-weight:700;color:' + st.color + ';'
+            + '<span style="font-size:' + taille + 'px;font-weight:700;color:' + st.color + ';'
             + 'text-shadow:0 1px 2px rgba(255,255,255,0.9),0 0 6px rgba(255,255,255,0.8);">'
             + d.n + '</span>'
-            + '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;'
+            + '<span style="display:inline-block;width:' + point + 'px;height:' + point + 'px;border-radius:50%;'
             + 'background:' + st.color + ';margin-left:4px;vertical-align:middle;'
             + 'box-shadow:0 0 3px rgba(255,255,255,0.6);"></span>'
             + '</div>',
-        iconSize:   [120, 16],
-        iconAnchor: [60, 8]
+        iconSize:   [largeur, hauteur],
+        iconAnchor: [largeur / 2, hauteur / 2]
       });
       L.marker([d.lat, d.lng], { icon: icon, interactive: false, keyboard: false })
         .addTo(statusLabelLayer);
